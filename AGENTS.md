@@ -198,3 +198,27 @@ Chat template and parser:
 - [PEG parser](docs/development/parsing.md) - alternative to regex that llama.cpp uses to parse model's output
 - [Auto parser](docs/autoparser.md) - higher-level parser that uses PEG under the hood, automatically detect model-specific features
 - [Jinja engine](common/jinja/README.md)
+
+## Fork-specific optimizations (HEchternacht/llama.cpp)
+
+This fork carries local performance changes on top of upstream. When merging/rebasing
+against upstream (ggml-org/llama.cpp), conflicts in the files below must be resolved
+PREFERRING THE FORK'S (ours) version - these changes are intentional and must survive:
+
+- `ggml/src/ggml-backend.cpp` - the main fork feature set:
+  - weight prefetch of upcoming split weights on a second CUDA backend (copy stream)
+  - double-buffered staging (2 slots) so upload of split N+1 overlaps compute of split N
+  - full-tensor uploads for batches >= ~128 tokens (prompt processing path)
+  - env `GGML_SCHED_PREFETCH=0` disables prefetch
+  - env `GGML_SCHED_PERF=N` prints per-backend copy/compute ms per graph every N graphs
+- `ggml/src/ggml-cpu/ggml-cpu.c` - CPU-side load/compute optimizations
+- `src/llama-mmap.cpp`, `src/llama-mmap.h` - model load-time optimizations
+- `src/llama-model-loader.cpp` - model load-time optimizations
+
+Merge recipe: `git merge upstream/master -X ours` then verify the fork additions are
+still present (search for `GGML_SCHED_PREFETCH` and `GGML_SCHED_PERF` in ggml-backend.cpp).
+
+Build notes (Windows/MSVC):
+- Configure with `-DGGML_AVX_VNNI=ON -DGGML_BMI2=ON` - MSVC SIMD autodetection misses these.
+- Do NOT leave stale `ggml*.dll` files in the output dir: `ggml_backend_load_all` dynamically
+  loads them even in static builds, silently overriding the built-in backends.
