@@ -218,6 +218,12 @@ PREFERRING THE FORK'S (ours) version - these changes are intentional and must su
 Merge recipe: `git merge upstream/master -X ours` then verify the fork additions are
 still present (search for `GGML_SCHED_PREFETCH` and `GGML_SCHED_PERF` in ggml-backend.cpp).
 
+Reverted upstream commits (do NOT re-import until upstream fixes them):
+- `6eddde06a` "CUDA: refactor MMQ kernel configuration (#24127)" - reverted in `56cd9a014`.
+  Breaks MUL_MAT_ID with CPU-offloaded MoE experts (-ncmoe) on sm_89: GGML_ASSERT
+  d_64 <= uint32 max in init_fastdiv_values and invalid-argument launch failures.
+  When upstream master contains a fix, drop the revert and re-test qwen35moe with -ncmoe.
+
 Build notes (Windows/MSVC):
 - Configure with `-DGGML_AVX_VNNI=ON -DGGML_BMI2=ON` - MSVC SIMD autodetection misses these.
 - Do NOT leave stale `ggml*.dll` files in the output dir: `ggml_backend_load_all` dynamically
