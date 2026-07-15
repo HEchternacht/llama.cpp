@@ -1514,6 +1514,54 @@ static void ggml_compute_forward_mul_mat_id_one_chunk(
     }
 }
 
+// expert routing stats (GGML_MOE_STATS=1): aggregate expert usage across all CPU mul_mat_id calls
+// and periodically print how much of the traffic the hottest experts cover
+#define MOE_STATS_MAX_EXPERTS 1024
+
+static int64_t moe_stats_counts[MOE_STATS_MAX_EXPERTS];
+static int64_t moe_stats_total  = 0;
+static int64_t moe_stats_calls  = 0;
+static int     moe_stats_enabled = -1;
+
+static int moe_stats_cmp_desc(const void * a, const void * b) {
+    const int64_t va = *(const int64_t *) a;
+    const int64_t vb = *(const int64_t *) b;
+    return va < vb ? 1 : va > vb ? -1 : 0;
+}
+
+static void moe_stats_accum(const int64_t * row_counts, int n_as) {
+    if (moe_stats_enabled < 0) {
+        const char * env = getenv("GGML_MOE_STATS");
+        moe_stats_enabled = env != NULL && atoi(env) > 0;
+    }
+    if (!moe_stats_enabled || n_as < 2 || n_as > MOE_STATS_MAX_EXPERTS) {
+        return;
+    }
+    for (int i = 0; i < n_as; ++i) {
+        moe_stats_counts[i] += row_counts[i];
+        moe_stats_total    += row_counts[i];
+    }
+    // ~3 calls per moe layer per token; print roughly every few hundred tokens
+    if (++moe_stats_calls % 32768 != 0 || moe_stats_total == 0) {
+        return;
+    }
+    int64_t sorted[MOE_STATS_MAX_EXPERTS];
+    memcpy(sorted, moe_stats_counts, n_as*sizeof(int64_t));
+    qsort(sorted, n_as, sizeof(int64_t), moe_stats_cmp_desc);
+    const int tiers[4] = { n_as/20, n_as/10, n_as/4, n_as/2 }; // 5%, 10%, 25%, 50%
+    int64_t cum = 0;
+    int     idx = 0;
+    double  cov[4] = { 0 };
+    for (int t = 0; t < 4; ++t) {
+        for (; idx < tiers[t]; ++idx) {
+            cum += sorted[idx];
+        }
+        cov[t] = 100.0 * (double) cum / (double) moe_stats_total;
+    }
+    fprintf(stderr, "moe stats: %lld activations, coverage by hottest experts: top %d: %.1f%%, top %d: %.1f%%, top %d: %.1f%%, top %d: %.1f%%\n",
+        (long long) moe_stats_total, tiers[0], cov[0], tiers[1], cov[1], tiers[2], cov[2], tiers[3], cov[3]);
+}
+
 static void * incr_ptr_aligned(void ** p, size_t size, size_t align) {
 
     void * ptr = *p;
@@ -1625,6 +1673,8 @@ static void ggml_compute_forward_mul_mat_id(
                 matrix_row_counts[i02] += 1;
             }
         }
+
+        moe_stats_accum(matrix_row_counts, n_as);
     }
 
     // reset current_chunk
