@@ -2759,7 +2759,7 @@ struct clip_model_loader {
                     // Load separate layerwise and spatial projector tensors
                     const auto projector_count = hparams.feature_layers.size();
                     model.qf_proj_blocks.resize(projector_count);
-                    for (size_t bid = 0; bid < projector_count; ++bid) {
+                    for (int bid = 0; bid < (int) projector_count; ++bid) {
                         auto & b = model.qf_proj_blocks[bid];
 
                         // non-layerwise tensors
