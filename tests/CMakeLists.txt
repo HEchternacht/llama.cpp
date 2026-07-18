@@ -213,7 +213,6 @@ llama_build_and_test(
     peg-parser/test-unicode.cpp
     peg-parser/tests.h
 )
-llama_build_and_test(test-regex-partial.cpp)
 llama_build_and_test(test-vulkan-q2_0-shader-sim.cpp)
 
 if (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "s390x")

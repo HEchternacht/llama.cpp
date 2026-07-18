@@ -1312,6 +1312,7 @@ void llm_graph_result::set_outputs(const llm_graph_params & params) {
                 ggml_set_output(t_layer_inp[il]);
             }
         }
+    }
     if (t_h_capture != nullptr) {
         ggml_set_output(t_h_capture);
     }

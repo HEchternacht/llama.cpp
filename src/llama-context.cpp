@@ -974,6 +974,8 @@ float * llama_context::get_embeddings_layer_inp(uint32_t lid) {
     GGML_ASSERT(lid < embd_layer_inp.size() && embd_layer_inp[lid].has_data());
 
     return embd_layer_inp[lid].data;
+}
+
 uint32_t llama_context::get_n_capture() const {
     return cparams.n_capture_layers;
 }
@@ -1217,6 +1219,8 @@ void llama_context::set_embeddings_layer_inp(uint32_t lid, bool enable) {
 
 void llama_context::set_nextn_layer_offset(int32_t offset) {
     cparams.nextn_layer_offset = offset;
+}
+
 void llama_context::set_capture_layers(const std::vector<int32_t> & layer_ids, bool masked) {
     // reset
     cparams.embeddings_capture        = false;
@@ -2299,6 +2303,7 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
         if (enabled) {
             embd_layer_inp_float_count += (size_t) n_embd * n_batch;
         }
+    }
     if (has_embd_capture && !cparams.embeddings_capture_masked) {
         // unmasked: same as embeddings_nextn above -- a capture row exists for
         // every token in the batch, not just output rows, so size by token count.
@@ -4110,6 +4115,8 @@ float * llama_get_embeddings_layer_inp(llama_context * ctx, uint32_t lid) {
     ctx->synchronize();
 
     return ctx->get_embeddings_layer_inp(lid);
+}
+
 // multi-layer hidden-state tap C API (staging) -------------------------------
 
 void llama_set_capture_layers(llama_context * ctx, const int32_t * layer_ids, size_t n_layers, bool masked) {

@@ -451,7 +451,7 @@ llama_memory_context_ptr llama_memory_recurrent::init_batch(llama_batch_allocr &
                 } else {
                     // TODO: non-sequential equal split can be done if using unified KV cache
                     //       for simplicity, we always use sequential equal split for now
-                    ubatch = balloc.split_equal(n_ubatch, true);
+                    ubatch = balloc.split_equal(n_ubatch, true, 0);
                 }
             }
 

@@ -86,7 +86,7 @@ llama_memory_context_ptr llama_memory_hybrid_iswa::init_batch(llama_batch_allocr
                 } else {
                     // Use non-sequential split when KV cache is unified (needed for hellaswag/winogrande/multiple-choice)
                     const bool unified = (mem_attn->get_base()->get_n_stream() == 1);
-                    ubatch = balloc.split_equal(n_ubatch, !unified);
+                    ubatch = balloc.split_equal(n_ubatch, !unified, 0);
                 }
             }
 
