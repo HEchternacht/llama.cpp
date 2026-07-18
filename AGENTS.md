@@ -218,6 +218,14 @@ PREFERRING THE FORK'S (ours) version - these changes are intentional and must su
 Merge recipe: `git merge upstream/master -X ours` then verify the fork additions are
 still present (search for `GGML_SCHED_PREFETCH` and `GGML_SCHED_PERF` in ggml-backend.cpp).
 
+PrismML merge (branch `merge-prismml`, merged from PrismML-Eng/llama.cpp `prism`):
+- Q2_0 uses PrismML's 128-element blocks (Bonsai GGUF format), NOT upstream's 64-element
+  Q2_0 (PR #24448). Upstream-quantized Q2_0 files are incompatible; do not re-import
+  upstream Q2_0 kernel changes without converting them to 128-block layout.
+- Also adds: dspark block-diffusion drafter, multi-layer capture tap (embd_capture,
+  coexists with the fork's embd_layer_inp tap), GDN rows mode + rotating snapshot ring,
+  Hopper wgmma Q1_0/Q2_0 prefill path, KV mean-centering tool.
+
 Reverted upstream commits (do NOT re-import until upstream fixes them):
 - `6eddde06a` "CUDA: refactor MMQ kernel configuration (#24127)" - reverted in `56cd9a014`.
   Breaks MUL_MAT_ID with CPU-offloaded MoE experts (-ncmoe) on sm_89: GGML_ASSERT
