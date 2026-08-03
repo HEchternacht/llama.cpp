@@ -562,14 +562,37 @@ struct llama_mmap::impl {
 
             pPrefetchVirtualMemory = (decltype(pPrefetchVirtualMemory))(void *) GetProcAddress(hKernel32, "PrefetchVirtualMemory");
 
+            const size_t prefetch_size = std::min(size, prefetch);
+
             if (pPrefetchVirtualMemory) {
                 WIN32_MEMORY_RANGE_ENTRY range;
                 range.VirtualAddress = addr;
-                range.NumberOfBytes = (SIZE_T) std::min(size, prefetch);
+                range.NumberOfBytes = (SIZE_T) prefetch_size;
                 if (!pPrefetchVirtualMemory(GetCurrentProcess(), 1, &range, 0)) {
                     LLAMA_LOG_WARN("warning: PrefetchVirtualMemory failed: %s\n",
                             llama_format_win_err(GetLastError()).c_str());
                 }
+            }
+
+            // PrefetchVirtualMemory only queues the reads and is free to ignore the request, so
+            // pages the model keeps in system memory can still be missing once loading reports
+            // done, stalling the first batch that touches them. touch every page to make the
+            // range resident here instead, matching the synchronous MAP_POPULATE used on POSIX.
+            {
+                SYSTEM_INFO si;
+                GetSystemInfo(&si);
+
+                const int64_t t_start = ggml_time_us();
+
+                volatile const uint8_t * p = (volatile const uint8_t *) addr;
+                uint8_t acc = 0;
+                for (size_t off = 0; off < prefetch_size; off += si.dwPageSize) {
+                    acc += p[off];
+                }
+                GGML_UNUSED(acc);
+
+                LLAMA_LOG_DEBUG("%s: faulted in %.2f MiB in %.2f s\n", __func__,
+                        prefetch_size / 1024.0 / 1024.0, (ggml_time_us() - t_start) / 1e6);
             }
 #else
             LLAMA_LOG_DEBUG("skipping PrefetchVirtualMemory because _WIN32_WINNT < 0x602\n");
