@@ -768,7 +768,7 @@ to_fp16_cuda_t ggml_get_to_fp16_cuda(ggml_type type) {
         case GGML_TYPE_Q2_0:
             return dequantize_block_cont_cuda<QK2_0, QR2_0, dequantize_q2_0>;
         case GGML_TYPE_TQ2_0:
-            return dequantize_block_cont_cuda<QK_K, 4, dequantize_tq2_0>;
+            return dequantize_block_cont_cuda<QK_K, 1, dequantize_tq2_0>;
         case GGML_TYPE_Q4_0:
             return dequantize_row_q4_0_cuda;
         case GGML_TYPE_Q4_1:
@@ -830,7 +830,7 @@ to_fp32_cuda_t ggml_get_to_fp32_cuda(ggml_type type) {
         case GGML_TYPE_Q2_0:
             return dequantize_block_cont_cuda<QK2_0, QR2_0, dequantize_q2_0>;
         case GGML_TYPE_TQ2_0:
-            return dequantize_block_cont_cuda<QK_K, 4, dequantize_tq2_0>;
+            return dequantize_block_cont_cuda<QK_K, 1, dequantize_tq2_0>;
         case GGML_TYPE_Q4_0:
             return dequantize_row_q4_0_cuda;
         case GGML_TYPE_Q4_1:

@@ -47,16 +47,19 @@ static __device__ __forceinline__ void dequantize_tq2_0(const void * vx, const i
 
     const float d = x[ib].d;
 
-    // tq2_0: 2-bit ternary codes, 4 elements per byte (QK_K = 256 per block).
-    // Code c in {0,1,2,3} maps to symbol s = c - 1 in {-1, 0, 0, +1}.
-    const int byte_index_0 = iqs       / 4;
-    const int bit_offset_0 = (iqs      % 4) * 2;
+    // tq2_0: 2-bit ternary codes (QK_K = 256 per block, one fp16 scale).
+    // Packing (matches ggml-quants.c): element e -> byte = 32*(e/128) + (e%32),
+    // lane = (e/32)%4. Code c in {0,1,2,3} maps to symbol s = c - 1 in {-1, 0, 0, +1}.
+    const int e0 = iqs;
+    const int e1 = iqs + 1;
 
-    const int byte_index_1 = (iqs + 1) / 4;
-    const int bit_offset_1 = ((iqs + 1) % 4) * 2;
+    const int b0 = 32 * (e0 >> 7) + (e0 & 31);
+    const int l0 = (e0 >> 5) & 3;
+    const int b1 = 32 * (e1 >> 7) + (e1 & 31);
+    const int l1 = (e1 >> 5) & 3;
 
-    const int c0 = (x[ib].qs[byte_index_0] >> bit_offset_0) & 0x3;
-    const int c1 = (x[ib].qs[byte_index_1] >> bit_offset_1) & 0x3;
+    const int c0 = (x[ib].qs[b0] >> (2 * l0)) & 0x3;
+    const int c1 = (x[ib].qs[b1] >> (2 * l1)) & 0x3;
 
     v.x = (c0 - 1) * d;
     v.y = (c1 - 1) * d;

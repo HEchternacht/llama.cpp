@@ -109,7 +109,8 @@ static __device__ __forceinline__ uint32_t unpack_ksigns(const uint8_t v) {
 #define VDR_Q1_0_Q8_1_MMVQ 1  // Process one 32-element chunk at a time for parallelism
 #define VDR_Q1_0_Q8_1_MMQ  4  // Q1_0 has 128 bits (4 ints) per block
 
-#define VDR_Q2_0_Q8_1_MMVQ 1  // Process one 32-element chunk at a time for parallelism
+#define VDR_Q2_0_Q8_1_MMVQ 1
+#define VDR_TQ2_0_Q8_1_MMVQ 1 // one 32-element chunk per vec_dot call (like Q2_0)  // Process one 32-element chunk at a time for parallelism
 #define VDR_Q2_0_Q8_1_MMQ  4  // Q2_0 has 256 bits (8 ints) per block, 4 32-element chunks
 
 #define VDR_Q4_0_Q8_1_MMVQ 2
@@ -798,6 +799,30 @@ static __device__ __forceinline__ float vec_dot_q2_0_q8_1(
     // (see quantize_q8_1: y[ib].ds = make_half2(d, sum)).
     const float2 ds8f = __half22float2(bq8_1_chunk->ds);
     return d2 * (sumi * ds8f.x - ds8f.y);
+}
+
+static __device__ __forceinline__ float vec_dot_tq2_0_q8_1(
+    const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs) {
+    const block_tq2_0 * bq = (const block_tq2_0 *) vbq + kbx;
+
+    // tq2_0: QK_K = 256 elements, ONE fp16 scale, 2-bit ternary codes.
+    // Packing: element e -> byte = 32*(e/128) + (e%32), lane = (e/32)%4.
+    // Chunk iqs (0..7) covers 32 elements: byte = 32*(iqs/4) + j, lane = iqs%4.
+    const float d = bq->d;
+
+    const int byte_base = 32 * (iqs >> 2);
+    const int lane      = iqs & 3;
+    const block_q8_1 * bq8_1_chunk = bq8_1 + iqs;
+
+    int sumi = 0;
+#pragma unroll
+    for (int j = 0; j < 32; ++j) {
+        const int code = (bq->qs[byte_base + j] >> (2 * lane)) & 0x3;
+        const int sym  = code - 1; // {-1, 0, 0, +1}
+        sumi += bq8_1_chunk->qs[j] * sym;
+    }
+
+    return sumi * (d * __low2float(bq8_1_chunk->ds));
 }
 
 static __device__ __forceinline__ float vec_dot_q4_0_q8_1(
