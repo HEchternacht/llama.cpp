@@ -2102,7 +2102,8 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
                         up = ggml_clamp(ctx0, up, -limit, limit);
                         cb(up, "ffn_moe_up_clamped", il);
 
-                        if (arch == LLM_ARCH_DEEPSEEK4) {
+                        // Maple (MLX reference) matches DeepSeek4: silu(min(gate, +CLAMP)) * clip(up, -CLAMP, +CLAMP)
+                        if (arch == LLM_ARCH_DEEPSEEK4 || arch == LLM_ARCH_MAPLE) {
                             cur = ggml_clamp(ctx0, cur, -INFINITY, limit);
                             cb(cur, "ffn_moe_gate_clamped", il);
                             cur = ggml_swiglu_split(ctx0, cur, up);

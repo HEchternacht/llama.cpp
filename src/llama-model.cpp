@@ -304,6 +304,8 @@ static llama_model * llama_model_mapping(llm_arch arch, const llama_model_params
             return new llama_model_kimi_linear(params);
         case LLM_ARCH_STEP35:
             return new llama_model_step35(params);
+        case LLM_ARCH_MAPLE:
+            return new llama_model_maple(params);
         case LLM_ARCH_DSPARK:
             // Phase 1 (forward graph) is implemented -- see src/models/dspark.cpp.
             // The block-draft loop (common/speculative.cpp) is a separate, later
@@ -2481,6 +2483,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
             return LLAMA_ROPE_TYPE_NORM;
 
         // the pairs of head values are offset by n_rot/2
+        case LLM_ARCH_MAPLE:
         case LLM_ARCH_FALCON:
         case LLM_ARCH_FALCON_H1:
         case LLM_ARCH_GROK:
