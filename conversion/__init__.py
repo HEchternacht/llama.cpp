@@ -44,6 +44,7 @@ TEXT_MODEL_MAP: dict[str, str] = {
     "Cohere2ForCausalLM": "command_r",
     "CohereForCausalLM": "command_r",
     "DbrxForCausalLM": "dbrx",
+    "MapleForCausalLM": "maple",
     "DSparkForCausalLM": "dspark",
     "DsparkSpeculator": "dspark",
     "Qwen3DSparkModel": "dspark",
