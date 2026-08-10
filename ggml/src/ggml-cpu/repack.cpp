@@ -3080,7 +3080,7 @@ static block_q1_0x4 make_block_q1_0x4(block_q1_0 * in, unsigned int blck_size_in
     return out;
 }
 
-static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, unsigned int blck_size_interleave) {
+static block_q4_0x4 make_block_q4_0x4(block_q4_0 * in, int blck_size_interleave) {
     block_q4_0x4 out;
 
     for (int i = 0; i < 4; i++) {

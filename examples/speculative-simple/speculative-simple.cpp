@@ -92,6 +92,11 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    const auto output_limits = common_speculative_get_output_limits(
+            params.n_batch, params.n_parallel, common_speculative_n_max(&params.speculative));
+    params.n_outputs_max = output_limits.total;
+    params.n_outputs_max_per_seq = output_limits.per_seq;
+
     // init llama.cpp
     llama_backend_init();
     llama_numa_init(params.numa);
@@ -117,6 +122,9 @@ int main(int argc, char ** argv) {
         const auto & params_spec = params.speculative.draft;
 
         auto params_dft = params;
+
+        params_dft.n_outputs_max = params.n_parallel;
+        params_dft.n_outputs_max_per_seq = 1;
 
         params_dft.devices      = params_spec.devices;
         params_dft.model        = params_spec.mparams;

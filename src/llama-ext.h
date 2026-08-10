@@ -230,3 +230,9 @@ LLAMA_API bool llama_dspark_markov_resample(
         int32_t               n_rows,
         llama_token           prev_token,
         llama_token         * result);
+
+// retrieves the whole token embedding matrix in F32 format (n_embd * n_vocab)
+// returns total number of elements or 0 on error
+// if out is nullptr, returns the number of tokens without writing to out
+// caller must allocate enough memory for out before calling
+LLAMA_API uint32_t llama_model_get_tok_embd(const struct llama_model * model, float * out);
