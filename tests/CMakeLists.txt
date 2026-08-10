@@ -212,10 +212,11 @@ if (NOT WIN32 OR NOT BUILD_SHARED_LIBS)
 
     llama_test(
         test-recurrent-state-rollback
+        NAME test-recurrent-state-rollback-gen
         LABEL main
         ARGS -m "${MODEL_DIR}/qwen35-dense.gguf"
     )
-    set_tests_properties(test-recurrent-state-rollback PROPERTIES
+    set_tests_properties(test-recurrent-state-rollback-gen PROPERTIES
         FIXTURES_REQUIRED generate-models
     )
 endif()
@@ -279,7 +280,8 @@ llama_build_and_test(test-backend-sampler.cpp   LABEL "model")
 llama_build_and_test(test-state-restore-fragmented.cpp LABEL "model" ARGS -m "${MODEL_DEST}")
 set_tests_properties(test-state-restore-fragmented PROPERTIES FIXTURES_REQUIRED test-download-model)
 
-llama_build_and_test(test-recurrent-state-rollback.cpp LABEL "model" ARGS -m "${MODEL_DEST}")
+# target already built above (llama_build), so only register the test here
+llama_test(test-recurrent-state-rollback LABEL "model" ARGS -m "${MODEL_DEST}")
 set_tests_properties(test-recurrent-state-rollback PROPERTIES FIXTURES_REQUIRED test-download-model)
 
 # Rotating recurrent-state snapshot ring (n_rs_seq). This needs a recurrent

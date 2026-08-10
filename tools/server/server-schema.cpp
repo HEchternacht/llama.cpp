@@ -539,6 +539,7 @@ std::vector<std::unique_ptr<field>> make_llama_cmpl_schema(const common_params &
 task_params eval_llama_cmpl_schema(
                 const llama_vocab * vocab,
                 const common_params & params_base,
+                const int n_ctx_slot,
                 const std::vector<llama_logit_bias> & logit_bias_eog,
                 const json & data) {
     task_params params;
@@ -572,6 +573,15 @@ task_params eval_llama_cmpl_schema(
 
     // post-processing
     {
+        if (params.sampling.penalty_last_n == -1) {
+            // note: should be the slot's context and not the full context, but it's ok
+            params.sampling.penalty_last_n = n_ctx_slot;
+        }
+
+        if (params.sampling.dry_penalty_last_n == -1) {
+            params.sampling.dry_penalty_last_n = n_ctx_slot;
+        }
+
         // if "reasoning_format" is not provided, its handler will not be called, we will need to handle it here
         auto reasoning_format = params.chat_parser_params.reasoning_format;
         params.chat_parser_params.reasoning_in_content = params.stream && (reasoning_format == COMMON_REASONING_FORMAT_DEEPSEEK_LEGACY);

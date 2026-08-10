@@ -1421,9 +1421,9 @@ void llm_graph_result::set_outputs(const llm_graph_params & params) {
     if (t_h_capture != nullptr) {
         ggml_set_output(t_h_capture);
     }
-    for (auto & [seq_id, t] : t_sampled) {
-        if (t != nullptr) {
-            ggml_set_output(t);
+    for (auto * tensor : t_sampled) {
+        if (tensor != nullptr) {
+            ggml_set_output(tensor);
         }
     }
     for (auto * tensor : t_sampled_probs) {

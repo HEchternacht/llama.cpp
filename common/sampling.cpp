@@ -448,7 +448,7 @@ struct common_sampler * common_sampler_init(const struct llama_model * model, st
         if (params.reasoning_budget_start.empty() || params.reasoning_budget_end.empty()) {
             // no tags configured (e.g. plain CLI usage) - fall back to the conventional ones
             params.reasoning_budget_start = common_tokenize(vocab, "<think>",  false, true);
-            params.reasoning_budget_end   = common_tokenize(vocab, "</think>", false, true);
+            params.reasoning_budget_end   = { common_tokenize(vocab, "</think>", false, true) };
 
             LOG_WRN("%s: no reasoning tags configured, defaulting to <think> / </think>\n", __func__);
         }
@@ -456,7 +456,8 @@ struct common_sampler * common_sampler_init(const struct llama_model * model, st
 
     if (has_phase_grammars) {
         std::string end_tag;
-        for (const auto & token : params.reasoning_budget_end) {
+        // the first end tag is the forcing sequence; use it to wrap the reasoning grammar
+        for (const auto & token : params.reasoning_budget_end.front()) {
             end_tag += common_token_to_piece(vocab, token, true);
         }
 
@@ -671,7 +672,9 @@ void common_sampler_accept(struct common_sampler * gsmpl, llama_token token, boo
 
         // if done, replay end sequence which may contain a grammar trigger
         const bool is_done = common_reasoning_budget_get_state(gsmpl->rbudget) == REASONING_BUDGET_DONE;
-        if (gsmpl->grmr && !accept_grammar && is_done) {
+        // grmr was not fed tokens during the block, so replay the end sequence into it
+        const bool grmr_accepted = std::find(grammars.begin(), grammars.end(), gsmpl->grmr) != grammars.end();
+        if (gsmpl->grmr && !grmr_accepted && is_done) {
             const llama_tokens * end_seq = common_reasoning_budget_get_end_match(gsmpl->rbudget);
             if (end_seq) {
                 for (const llama_token end_token : *end_seq) {
