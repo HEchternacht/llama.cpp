@@ -319,6 +319,7 @@ using server_task_result_ptr = std::unique_ptr<server_task_result>;
 struct completion_token_output {
     llama_token tok;
     float prob;
+    float confidence = -1.0f; // post-sampling probability of the sampled token; -1 = not computed
     std::string text_to_send;
     struct prob_info {
         llama_token tok;
@@ -425,6 +426,7 @@ struct server_task_result_cmpl_partial : server_task_result {
     bool is_begin = false; // whether to send 200 status to HTTP client (begin of SSE stream)
                            // ref: https://github.com/ggml-org/llama.cpp/pull/23884
     completion_token_output prob_output;
+    float confidence = -1.0f; // post-sampling probability of the sampled token; -1 = not requested
     result_timings timings;
     result_prompt_progress progress;
 

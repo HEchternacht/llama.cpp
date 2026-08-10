@@ -10,6 +10,16 @@ import urllib.request
 MODEL_DIR = r"C:\cmodels"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_args.json")
 SERVER_EXE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "llama-server.exe")
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
+
+def log_event(msg):
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(os.path.join(LOG_DIR, "launcher.log"), "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
+    except Exception:
+        pass
 
 EXAMPLE_ARGS = (
     '-ngl all --jinja -fa on --models-max 1 --prio 2 -np 1 -c 65536 --api-key test '
@@ -95,12 +105,19 @@ def get_args_for_model(model_name, cfg):
     return args
 
 
-def prefix_cache(model_name, args):
+def pop_flag(name, args):
+    # launcher-only flags, never passed to llama-server
+    stripped = re.sub(r"\s*--" + name + r"\b", "", args)
+    return stripped.strip(), stripped != args
+
+
+def prefix_cache(model_name, args, getcache, norestore):
     # per-model persistent prompt-prefix cache:
-    # - on startup: restore cache/<model>-prefix.bin if present
-    # - after the first request: validate the prefix still matches; if stale or
-    #   missing, rebuild it as the longest common token prefix between this
-    #   session's prompt and the previous session's (stored in the sidecar)
+    # - on startup: restore cache/<model>-prefix.bin if present (unless --norestore)
+    # - with --getcache, after the first request: validate the prefix still
+    #   matches; if stale or missing, rebuild it as the longest common token
+    #   prefix between this session's prompt and the previous session's
+    #   (stored in the sidecar)
     stem = os.path.splitext(model_name)[0]
     prefix_file = stem + "-prefix.bin"
     slot_dir_m = re.search(r'--slot-save-path\s+"?([^\s"]+)', args)
@@ -122,24 +139,48 @@ def prefix_cache(model_name, args):
         return json.load(urllib.request.urlopen(req, timeout=timeout))
 
     def worker():
+        def note(msg):
+            print(f"[prefix-cache] {msg}")
+            log_event(f"prefix-cache [{model_name}]: {msg}")
+
+        # wait until the server on this port is healthy AND is actually running
+        # our model (on model switch the previous server may still hold the port,
+        # and touching its slots would corrupt this model's cache)
+        warned = False
         for _ in range(600):
             time.sleep(1)
             try:
-                if http("/health", timeout=2).get("status") == "ok":
+                if http("/health", timeout=2).get("status") != "ok":
+                    continue
+                mp = http("/props", timeout=5).get("model_path", "")
+                if os.path.basename(mp) == model_name:
                     break
+                if not warned:
+                    note(f"waiting: port still served by {os.path.basename(mp) or 'another model'}")
+                    warned = True
             except Exception:
                 continue
         else:
             return
 
         restored = False
-        if os.path.exists(bin_path):
+        if norestore:
+            note("restore disabled (--norestore)")
+        elif os.path.exists(bin_path):
             try:
                 res = http("/slots/0?action=restore", {"filename": prefix_file})
-                print(f"[prefix-cache] restored {res.get('n_restored')} tokens")
+                note(f"restored {res.get('n_restored')} tokens")
                 restored = True
             except Exception as e:
-                print(f"[prefix-cache] restore failed: {e}")
+                note(f"restore failed: {e}")
+        elif getcache:
+            note("no cache file yet, will build from first request")
+        else:
+            note("no cache file yet (--getcache off, nothing to build)")
+
+        if not getcache:
+            note("restore-only mode, prefix watcher disabled (add --getcache to build)")
+            return
 
         meta = {}
         if os.path.exists(meta_path):
@@ -149,63 +190,119 @@ def prefix_cache(model_name, args):
             except Exception:
                 meta = {}
 
-        # wait for the first completed request (needs LLAMA_SERVER_SLOTS_DEBUG=1)
-        prompt_text = None
-        while prompt_text is None:
+        # watch every completed request for the whole session (needs
+        # LLAMA_SERVER_SLOTS_DEBUG=1); compare each prompt against the
+        # previous session's longest prompt and rebuild the saved prefix
+        # whenever a meaningfully longer common prefix appears
+        last = meta.get("last_prompt_tokens") or []   # previous session's longest
+        prefix = (meta.get("prefix_tokens") or []) if restored else []
+        session_longest = []
+        seen = None
+        while True:
             time.sleep(3)
             try:
                 s = http("/slots", timeout=10)[0]
-                if s.get("id_task", -1) != -1 and not s.get("is_processing") and s.get("prompt"):
-                    prompt_text = s["prompt"]
             except Exception:
-                pass
+                continue
+            if s.get("id_task", -1) == -1 or s.get("is_processing") or not s.get("prompt"):
+                continue
+            if s["prompt"] == seen:
+                continue
+            seen = s["prompt"]
+            try:
+                new_tokens = http("/tokenize", {"content": seen})["tokens"]
+            except Exception as e:
+                print(f"[prefix-cache] tokenize failed: {e}")
+                continue
 
-        try:
-            new_tokens = http("/tokenize", {"content": prompt_text})["tokens"]
-        except Exception as e:
-            print(f"[prefix-cache] tokenize failed: {e}")
-            return
+            if len(new_tokens) > len(session_longest):
+                session_longest = new_tokens
+                meta["last_prompt_tokens"] = session_longest
+                try:
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(meta, f)
+                except Exception as e:
+                    print(f"[prefix-cache] meta write failed: {e}")
 
-        prefix = meta.get("prefix_tokens") if restored else None
-        if prefix and new_tokens[:len(prefix)] == prefix:
-            print(f"[prefix-cache] prefix valid ({len(prefix)} tokens)")
-        else:
-            last = meta.get("last_prompt_tokens")
-            cand = None
-            if last:
-                n = min(len(new_tokens), len(last))
+            def lcp(a, b):
+                n = min(len(a), len(b))
                 i = 0
-                while i < n and new_tokens[i] == last[i]:
+                while i < n and a[i] == b[i]:
                     i += 1
-                cand = new_tokens[:i]
-            if cand and len(cand) >= 512:
+                return i
+
+            cand = new_tokens[:lcp(new_tokens, last)]
+
+            # never cache past the first user turn
+            marks = ["<|im_start|>user", "<|user|>", "<|User|>", "[INST]",
+                     "<start_of_turn>user", "<|start_header_id|>user"]
+            pos = min((p for p in (seen.find(m) for m in marks) if p != -1), default=-1)
+            if pos > 0:
+                try:
+                    head = http("/tokenize", {"content": seen[:pos]})["tokens"]
+                    cand = cand[:lcp(new_tokens, head)]
+                except Exception:
+                    pass
+            valid = bool(prefix) and new_tokens[:len(prefix)] == prefix
+            # rebuild only when missing, or when a comparably-sized request
+            # proves the prefix stale (short side-requests can't judge - ignore)
+            stale = prefix and not valid and len(new_tokens) * 4 >= len(prefix) * 3
+            if (not prefix or stale) and len(cand) >= 512:
                 try:
                     http("/completion", {"prompt": cand, "n_predict": 0, "cache_prompt": True}, timeout=600)
                     res = http("/slots/0?action=save", {"filename": prefix_file})
+                    note(f"rebuilt: saved {res.get('n_saved')} tokens (was {len(prefix)})")
+                    prefix = cand
                     meta["prefix_tokens"] = cand
-                    print(f"[prefix-cache] rebuilt: saved {res.get('n_saved')} tokens")
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(meta, f)
+                    return
                 except Exception as e:
-                    print(f"[prefix-cache] rebuild failed: {e}")
-            else:
-                print("[prefix-cache] no usable common prefix yet, will build next session")
+                    note(f"rebuild failed: {e}")
+            elif valid:
+                note(f"prefix valid ({len(prefix)} tokens)")
+                return
+            elif prefix:
+                note(f"prefix not matched by this request ({len(new_tokens)} tokens, lcp {len(cand)})")
 
-        meta["last_prompt_tokens"] = new_tokens
-        try:
-            with open(meta_path, "w", encoding="utf-8") as f:
-                json.dump(meta, f)
-        except Exception as e:
-            print(f"[prefix-cache] meta write failed: {e}")
+    # nothing to restore and nothing to build - don't even poll the server
+    if norestore and not getcache:
+        return
 
     threading.Thread(target=worker, daemon=True).start()
 
 
 def run(model_name, args):
+    args, getcache = pop_flag("getcache", args)
+    args, norestore = pop_flag("norestore", args)
     model_path = os.path.join(MODEL_DIR, model_name)
     cmd = f'"{SERVER_EXE}" -m "{model_path}" {args}'
     print(f"\n{cmd}\n")
-    os.environ["LLAMA_SERVER_SLOTS_DEBUG"] = "1"
-    prefix_cache(model_name, args)
-    subprocess.run(cmd, shell=True)
+    # only the prefix watcher needs slots debug (it reads the prompt text off
+    # /slots); it also costs a copy of every generated text and a token dump on
+    # each cache mismatch, so keep it off otherwise
+    if getcache:
+        os.environ["LLAMA_SERVER_SLOTS_DEBUG"] = "1"
+    else:
+        os.environ.pop("LLAMA_SERVER_SLOTS_DEBUG", None)
+    prefix_cache(model_name, args, getcache, norestore)
+
+    os.makedirs(LOG_DIR, exist_ok=True)
+    run_log = os.path.join(LOG_DIR, f"server-{time.strftime('%Y%m%d-%H%M%S')}.log")
+    log_event(f"server start: {model_name} | full output: {os.path.basename(run_log)}")
+    log_event(f"  args: {args}")
+    # tee server output: console + full per-run log file
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    with open(run_log, "wb") as lf:
+        for line in p.stdout:
+            sys.stdout.buffer.write(line)
+            sys.stdout.buffer.flush()
+            lf.write(line)
+    rc = p.wait()
+    if rc == 0:
+        log_event(f"server exit: {model_name} (clean)")
+    else:
+        log_event(f"server CRASH/kill: {model_name} exit code {rc} - see {os.path.basename(run_log)}")
 
 
 def main():
@@ -223,4 +320,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+        log_event("launcher traceback:\n" + traceback.format_exc())
+        raise

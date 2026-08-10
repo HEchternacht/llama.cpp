@@ -43,6 +43,7 @@ json task_params::to_json(bool only_metrics) const {
         return json {
             {"seed",                      sampling.seed},
             {"temperature",               sampling.temp},
+            {"reasoning_temp",            sampling.reasoning_temp},
             {"dynatemp_range",            sampling.dynatemp_range},
             {"dynatemp_exponent",         sampling.dynatemp_exponent},
             {"top_k",                     sampling.top_k},
@@ -70,6 +71,7 @@ json task_params::to_json(bool only_metrics) const {
             {"ignore_eos",                sampling.ignore_eos},
             {"stream",                    stream},
             {"n_probs",                   sampling.n_probs},
+            {"stream_confidence",         sampling.stream_confidence},
             {"min_keep",                  sampling.min_keep},
             {"chat_format",               common_chat_format_name(chat_parser_params.format)},
             {"reasoning_format",          common_reasoning_format_name(chat_parser_params.reasoning_format)},
@@ -93,6 +95,7 @@ json task_params::to_json(bool only_metrics) const {
     return json {
         {"seed",                      sampling.seed},
         {"temperature",               sampling.temp},
+        {"reasoning_temp",            sampling.reasoning_temp},
         {"dynatemp_range",            sampling.dynatemp_range},
         {"dynatemp_exponent",         sampling.dynatemp_exponent},
         {"top_k",                     sampling.top_k},
@@ -125,6 +128,8 @@ json task_params::to_json(bool only_metrics) const {
         {"n_probs",                   sampling.n_probs},
         {"min_keep",                  sampling.min_keep},
         {"grammar",                   common_grammar_value(sampling.grammar)},
+        {"reasoning_grammar",         common_grammar_value(sampling.reasoning_grammar)},
+        {"final_answer_grammar",      common_grammar_value(sampling.final_answer_grammar)},
         {"grammar_lazy",              sampling.grammar_lazy},
         {"grammar_triggers",          grammar_triggers},
         {"preserved_tokens",          sampling.preserved_tokens},
@@ -1091,6 +1096,9 @@ json server_task_result_cmpl_partial::to_json_non_oaicompat() {
     if (!prob_output.probs.empty()) {
         res["completion_probabilities"] = completion_token_output::probs_vector_to_json({prob_output}, post_sampling_probs);
     }
+    if (confidence >= 0.0f) {
+        res["confidence"] = confidence;
+    }
     return res;
 }
 
@@ -1109,6 +1117,7 @@ json server_task_result_cmpl_partial::to_json_oaicompat() {
                 {"index",         index},
                 {"logprobs",      logprobs},
                 {"finish_reason", nullptr},
+                {"confidence",    confidence >= 0.0f ? json(confidence) : json(nullptr)},
             }
         })},
         {"created",            t},
@@ -1174,6 +1183,10 @@ json server_task_result_cmpl_partial::to_json_oaicompat_chat() {
             last_json.at("choices").at(0)["logprobs"] = json {
                 {"content", completion_token_output::probs_vector_to_json({prob_output}, post_sampling_probs)},
             };
+        }
+
+        if (confidence >= 0.0f) {
+            last_json.at("choices").at(0)["confidence"] = confidence;
         }
 
         if (timings.prompt_n >= 0) {

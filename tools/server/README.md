@@ -148,8 +148,13 @@ For the full list of features, please refer to [server's changelog](https://gith
 | `--mirostat-lr N` | Mirostat learning rate, parameter eta (default: 0.10) |
 | `--mirostat-ent N` | Mirostat target entropy, parameter tau (default: 5.00) |
 | `-l, --logit-bias TOKEN_ID(+/-)BIAS` | modifies the likelihood of token appearing in the completion,<br/>i.e. `--logit-bias 15043+1` to increase likelihood of token ' Hello',<br/>or `--logit-bias 15043-1` to decrease likelihood of token ' Hello' |
+| `--reasoning-temp N` | temperature used inside reasoning blocks; outside them `--temp` applies (default: disabled) |
 | `--grammar GRAMMAR` | BNF-like grammar to constrain generations (see samples in grammars/ dir) |
 | `--grammar-file FNAME` | file to read grammar from |
+| `--reasoning-grammar GRAMMAR` | BNF-like grammar applied only inside the reasoning block |
+| `--reasoning-grammar-file FNAME` | file to read the reasoning grammar from |
+| `--final-answer-grammar GRAMMAR` | BNF-like grammar applied only after the reasoning block has ended |
+| `--final-answer-grammar-file FNAME` | file to read the final answer grammar from |
 | `-j, --json-schema SCHEMA` | JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object<br/>For schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead |
 | `-jf, --json-schema-file FILE` | File containing a JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object<br/>For schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead |
 | `-bs, --backend-sampling` | enable backend sampling (experimental) (default: disabled)<br/>(env: LLAMA_ARG_BACKEND_SAMPLING) |
@@ -497,6 +502,12 @@ These words will not be included in the completion, so make sure to add them to 
 
 `json_schema`: Set a JSON schema for grammar-based sampling (e.g. `{"items": {"type": "string"}, "minItems": 10, "maxItems": 100}` of a list of strings, or `{}` for any JSON). See [tests](../../tests/test-json-schema-to-grammar.cpp) for supported features.  Default: no JSON schema.
 
+`reasoning_temp`: Temperature used for the tokens generated inside the reasoning block. Outside the block (and before it opens) `temperature` applies. Lets the model think freely while keeping the answer and tool calls deterministic, e.g. `--temp 0.0 --reasoning-temp 1.0`. All other samplers are unchanged between the two phases. Default: `-1` (disabled, `temperature` everywhere).
+
+`reasoning_grammar`: Set a grammar applied only to the tokens generated inside the reasoning block. Unless the grammar already mentions the reasoning end tag (e.g. `</think>`), it is wrapped automatically so that it can close the block — meaning the grammar only has to describe the reasoning *content*. Combines with `grammar`. Default: no grammar.
+
+`final_answer_grammar`: Set a grammar applied only to the answer generated after the reasoning block has ended. On a model that does not emit a reasoning block, it applies to the whole response. Combines with `grammar`. Default: no grammar.
+
 `seed`: Set the random number generator (RNG) seed.  Default: `-1`, which is a random seed.
 
 `ignore_eos`: Ignore end of stream token and continue generating.  Default: `false`
@@ -524,6 +535,8 @@ These words will not be included in the completion, so make sure to add them to 
 `sse_ping_interval`: Interval in seconds between SSE comment pings emitted while the stream stays silent, keeping the connection observable during long prompt processing. Overrides the server `--sse-ping-interval` setting for this request, `-1` disables pings. Default: server setting
 
 `post_sampling_probs`: Returns the probabilities of top `n_probs` tokens after applying sampling chain.
+
+`stream_confidence`: If true, each streamed chunk includes a `confidence` field with the post-sampling probability of the sampled token. Independent of `n_probs`/`logprobs`. Default: `false` (or the server's `--stream-confidence` default)
 
 `response_fields`: A list of response fields, for example: `"response_fields": ["content", "generation_settings/n_predict"]`. If the specified field is missing, it will simply be omitted from the response without triggering an error. Note that fields with a slash will be unnested; for example, `generation_settings/n_predict` will move the field `n_predict` from the `generation_settings` object to the root of the response and give it a new name.
 
@@ -1162,6 +1175,47 @@ To know the `id` of the adapter, use GET `/lora-adapters`
   {"id": 1, "scale": 0.8}
 ]
 ```
+
+### GET `/grammar`, GET `/v1/grammar`: Get the server-level grammars
+
+Returns the grammars a new completion will use if it does not set any itself — either the values the server was started with, or whatever was last set through POST `/grammar`.
+
+```json
+{
+  "grammar": "",
+  "reasoning_grammar": "root ::= \"ZAP \"{3}",
+  "final_answer_grammar": ""
+}
+```
+
+An empty string means no grammar.
+
+### POST `/grammar`, POST `/v1/grammar`: Set the server-level grammars at runtime
+
+Sets, replaces or removes the default grammars without restarting the server. The body is a JSON object; each of `grammar`, `reasoning_grammar` and `final_answer_grammar` is handled independently:
+
+| Value | Effect |
+| ----- | ------ |
+| `"<gbnf>"` | sets or replaces the grammar |
+| `""` | removes the grammar |
+| `null` | drops the override, restoring the value the server was started with |
+| absent | left untouched |
+
+```sh
+curl http://localhost:8080/v1/grammar -H "Content-Type: application/json" -d '{
+  "reasoning_grammar": "root ::= \"ZAP \"{3}",
+  "final_answer_grammar": "root ::= \"OK-\" [0-9]"
+}'
+```
+
+Returns the resulting state, in the same format as GET `/grammar`.
+
+Notes:
+
+- Grammars are parsed before anything is changed, so a request containing an invalid grammar fails with `400` and leaves the server untouched.
+- A request that sets the field itself always wins over the server-level value. This includes a `grammar` produced from `json_schema`, `response_format` or a tool-call template, which is why setting a server-level `grammar` never breaks structured output or tool calling.
+- Only completions started after the call are affected; requests already running keep the sampler they were created with.
+- A body with none of the three fields is rejected with `400`.
 
 ## OpenAI-compatible API Endpoints
 

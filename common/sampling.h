@@ -97,6 +97,12 @@ bool common_sampler_reasoning_budget_force(struct common_sampler * gsmpl);
 // the .sorted flag of the result indicates whether the returned candidates are sorted
 llama_token_data_array * common_sampler_get_candidates(struct common_sampler * gsmpl, bool do_sort);
 
+// get the post-sampling-chain probability of the token that was just sampled
+// (i.e. cur_p->data[cur_p->selected].p); if the chain skipped softmax or destroyed
+// the logits of non-selected candidates (e.g. temp <= 0 greedy), this recomputes it
+// from the raw post-decode logits at position idx instead (see llama_get_logits_ith)
+float common_sampler_get_confidence(struct common_sampler * gsmpl, struct llama_context * ctx, int idx);
+
 // get the last accepted token
 llama_token common_sampler_last(const struct common_sampler * gsmpl);
 

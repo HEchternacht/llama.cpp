@@ -704,11 +704,17 @@ int llama_completion(int argc, char ** argv) {
 
         embd.clear();
 
+        float gen_confidence = -1.0f;
+
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
 
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
+
+            if (params.sampling.stream_confidence) {
+                gen_confidence = common_sampler_get_confidence(smpl, ctx, -1);
+            }
 
             // LOG_DBG("last: %s\n", string_from(ctx, smpl->prev.to_vector()).c_str());
 
@@ -759,6 +765,10 @@ int llama_completion(int argc, char ** argv) {
                     // Outgoing Generated Tokens
                     output_tokens.push_back(id);
                     output_ss << token_str;
+
+                    if (params.sampling.stream_confidence && gen_confidence >= 0.0f) {
+                        LOG(" [%.2f]", gen_confidence);
+                    }
                 }
             }
         }

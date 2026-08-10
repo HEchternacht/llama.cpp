@@ -225,6 +225,7 @@ struct common_params_sampling {
 
     int32_t n_prev             = 64;     // number of previous tokens to remember
     int32_t n_probs            = 0;      // if greater than 0, output the probabilities of top n_probs tokens.
+    bool    stream_confidence  = false;  // if true, output the post-sampling probability (confidence) of the sampled token
     int32_t min_keep           = 0;      // 0 = disabled, otherwise samplers should return at least min_keep tokens
     int32_t top_k              = 40;     // <= 0 to use vocab size
     float   top_p              = 0.95f;  // 1.0 = disabled
@@ -235,6 +236,8 @@ struct common_params_sampling {
     float   temp               = 0.80f;  // <= 0.0 to sample greedily, 0.0 to not output probabilities
     float   dynatemp_range     = 0.00f;  // 0.0 = disabled
     float   dynatemp_exponent  = 1.00f;  // controls how entropy maps to temperature in dynamic temperature sampler
+    float   reasoning_temp     = -1.00f; // < 0 = disabled, otherwise the temperature used inside reasoning blocks
+                                         // (gated on the reasoning block state machine, see reasoning-budget.h)
     int32_t penalty_last_n     = 64;     // last n tokens to penalize (0 = disable penalty, -1 = context size)
     float   penalty_repeat     = 1.00f;  // 1.0 = disabled
     float   penalty_freq       = 0.00f;  // 0.0 = disabled
@@ -270,6 +273,14 @@ struct common_params_sampling {
     };
 
     common_grammar              grammar;      // optional grammar constraint (user / output-format / tool-calls)
+
+    // optional phase-specific grammars, gated on the reasoning block state machine (see reasoning-budget.h)
+    // reasoning_grammar    is applied between the reasoning start and end tags
+    // final_answer_grammar is applied after the reasoning block has ended
+    // both are independent of (and combine with) `grammar`
+    common_grammar              reasoning_grammar;
+    common_grammar              final_answer_grammar;
+
     bool                                grammar_lazy = false;
     std::vector<common_grammar_trigger> grammar_triggers; // optional triggers (for lazy grammars)
     std::set<llama_token>               preserved_tokens;
@@ -542,6 +553,8 @@ struct common_params {
     bool lora_init_without_apply = false; // only load lora to memory, but do not apply it to ctx (user can manually apply lora later using llama_adapter_lora_apply)
     std::vector<common_adapter_lora_info> lora_adapters; // lora adapter path with user defined scale
 
+    std::string mol_config_path; // path to Mixture-of-LoRA orchestration config (server only)
+
     std::vector<common_control_vector_load_info> control_vectors; // control vector with user defined scale
 
     int32_t verbosity                  = 3;  // LOG_LEVEL_INFO
@@ -683,6 +696,8 @@ struct common_params {
     bool endpoint_slots   = true;
     bool endpoint_props   = false; // only control POST requests, not GET
     bool endpoint_metrics = false;
+
+    bool log_requests = false; // log full HTTP request/response bodies (httplib logger), off by default: spammy
 
     // enable built-in tools
     std::vector<std::string> server_tools;

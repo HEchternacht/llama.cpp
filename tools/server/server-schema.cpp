@@ -117,6 +117,9 @@ std::vector<std::unique_ptr<field>> make_llama_cmpl_schema(const common_params &
         ->set_limits(0.0f, std::numeric_limits<float>::infinity())
         ->set_desc("Adjust the randomness of the generated text (0 = greedy)"));
 
+    add((new field_num("reasoning_temp", params.sampling.reasoning_temp))
+        ->set_desc("Temperature used inside the reasoning block; outside it `temperature` applies (< 0 = disabled)"));
+
     add((new field_num("dynatemp_range", params.sampling.dynatemp_range))
         ->set_desc("Dynamic temperature range. The final temperature will be in [temperature - range, temperature + range] (0 = disabled)"));
 
@@ -189,6 +192,9 @@ std::vector<std::unique_ptr<field>> make_llama_cmpl_schema(const common_params &
 
     add((new field_bool("post_sampling_probs", params.post_sampling_probs))
         ->set_desc("Return probabilities of top n_probs tokens after applying the sampling chain"));
+
+    add((new field_bool("stream_confidence", params.sampling.stream_confidence))
+        ->set_desc("If true, include the post-sampling probability (confidence) of the sampled token in each streamed chunk"));
 
     //
     // Speculative decoding params
@@ -281,6 +287,24 @@ std::vector<std::unique_ptr<field>> make_llama_cmpl_schema(const common_params &
 
     add((new field_bool("grammar_lazy", params.sampling.grammar_lazy))
         ->set_desc("Whether to apply grammar constraints lazily, only when triggered (instead of at every step)"));
+
+    add((new field_str("reasoning_grammar"))
+        ->set_desc("GBNF grammar applied only inside the reasoning block. Wrapped automatically so it can emit the reasoning end tag, unless it already mentions it")
+        ->set_handler([&](field_eval_context & ctx, const json & data) {
+            std::string grammar_str = data.at("reasoning_grammar").get<std::string>();
+            ctx.params.sampling.reasoning_grammar = grammar_str.empty()
+                ? common_grammar()
+                : common_grammar(COMMON_GRAMMAR_TYPE_USER, std::move(grammar_str));
+        }));
+
+    add((new field_str("final_answer_grammar"))
+        ->set_desc("GBNF grammar applied only to the answer generated after the reasoning block")
+        ->set_handler([&](field_eval_context & ctx, const json & data) {
+            std::string grammar_str = data.at("final_answer_grammar").get<std::string>();
+            ctx.params.sampling.final_answer_grammar = grammar_str.empty()
+                ? common_grammar()
+                : common_grammar(COMMON_GRAMMAR_TYPE_USER, std::move(grammar_str));
+        }));
 
     //
     // Chat parser params

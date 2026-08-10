@@ -138,6 +138,41 @@ You can use GBNF grammars:
 - In [llama-cli](../tools/cli) and [llama-completion](../tools/completion), passed as the `--grammar` & `--grammar-file` flags
 - With [test-gbnf-validator](../tests/test-gbnf-validator.cpp), to test them against strings.
 
+## Reasoning-phase grammars
+
+On a reasoning model, a single grammar has to describe the reasoning block and the answer at once, which is rarely what you want. Two extra grammars can instead be attached to a single phase each:
+
+| | CLI flag | Server body field | Applies to |
+| --- | --- | --- | --- |
+| reasoning | `--reasoning-grammar`, `--reasoning-grammar-file` | `reasoning_grammar` | tokens generated between the reasoning start and end tags |
+| final answer | `--final-answer-grammar`, `--final-answer-grammar-file` | `final_answer_grammar` | tokens generated after the reasoning block has ended |
+
+Both are independent of `--grammar` / `grammar` and combine with it: when several grammars are active on the same token, it must satisfy all of them.
+
+```sh
+./llama-cli -m <model> \
+    --reasoning-grammar    'root ::= "STEP " [0-9] ". " [^\n]+ "\n"' \
+    --final-answer-grammar 'root ::= "ANSWER: " [0-9]+' \
+    -p 'How many wheels do 3 cars have?'
+```
+
+The reasoning grammar is **wrapped automatically** so it can close the reasoning block: the grammar only has to describe the reasoning *content*, and the end tag is appended for it. If the grammar text already mentions the end tag, it is used verbatim and no wrapping happens — so you can take control of when the block ends:
+
+```
+# wrapped: "</think>" is appended after three repetitions
+root ::= ("STEP " [0-9] ". " [^\n]+ "\n"){3}
+
+# not wrapped: the grammar closes the block itself, after 1 to 5 steps
+root ::= ("STEP " [0-9] ". " [^\n]+ "\n"){1,5} "</think>"
+```
+
+Notes:
+
+- Phase detection reuses the reasoning start/end tags the model's chat template provides. Outside llama-server, where no template is applied, it falls back to `<think>` / `</think>`.
+- The final answer grammar applies to the whole response on a model that never opens a reasoning block, which makes it a drop-in replacement for `--grammar` on non-reasoning models.
+- Neither grammar constrains the reasoning start tag itself: the model stays free to decide whether to open a reasoning block at all.
+- llama-server can also change both at runtime, see [GET/POST `/v1/grammar`](../tools/server#post-grammar-post-v1grammar-set-the-server-level-grammars-at-runtime).
+
 ## JSON Schemas → GBNF
 
 `llama.cpp` supports converting a subset of https://json-schema.org/ to GBNF grammars:

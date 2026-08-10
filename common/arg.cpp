@@ -1671,6 +1671,13 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples({LLAMA_EXAMPLE_COMPLETION, LLAMA_EXAMPLE_CLI, LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
+        {"--stream-confidence"},
+        "stream the post-sampling probability (confidence) of each generated token",
+        [](common_params & params) {
+            params.sampling.stream_confidence = true;
+        }
+    ).set_env("LLAMA_ARG_STREAM_CONFIDENCE").set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
         {"-cnv", "--conversation"},
         {"-no-cnv", "--no-conversation"},
         "whether to run in conversation mode:\n"
@@ -1790,6 +1797,15 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.temp = std::stof(value);
             params.sampling.temp = std::max(params.sampling.temp, 0.0f);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TEMP;
+        }
+    ).set_sampling());
+    add_opt(common_arg(
+        {"--reasoning-temp", "--reasoning_temp"}, "N",
+        "temperature used inside reasoning blocks (e.g. between <think> and </think>);\n"
+        "outside them --temp applies. useful to keep thinking creative and the answer deterministic\n"
+        "(default: disabled, i.e. --temp everywhere)",
+        [](common_params & params, const std::string & value) {
+            params.sampling.reasoning_temp = std::max(std::stof(value), 0.0f);
         }
     ).set_sampling());
     add_opt(common_arg(
@@ -2034,6 +2050,35 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "file to read grammar from",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_USER, read_file(value)};
+        }
+    ).set_sampling());
+    add_opt(common_arg(
+        {"--reasoning-grammar"}, "GRAMMAR",
+        "BNF-like grammar constraining only the reasoning block (between the thinking tags).\n"
+        "if the grammar does not mention the end tag itself, it is wrapped so the block can always be closed",
+        [](common_params & params, const std::string & value) {
+            params.sampling.reasoning_grammar = {COMMON_GRAMMAR_TYPE_USER, value};
+        }
+    ).set_sampling());
+    add_opt(common_arg(
+        {"--reasoning-grammar-file"}, "FNAME",
+        "file to read the reasoning grammar from",
+        [](common_params & params, const std::string & value) {
+            params.sampling.reasoning_grammar = {COMMON_GRAMMAR_TYPE_USER, read_file(value)};
+        }
+    ).set_sampling());
+    add_opt(common_arg(
+        {"--final-answer-grammar"}, "GRAMMAR",
+        "BNF-like grammar constraining only the answer generated after the reasoning block",
+        [](common_params & params, const std::string & value) {
+            params.sampling.final_answer_grammar = {COMMON_GRAMMAR_TYPE_USER, value};
+        }
+    ).set_sampling());
+    add_opt(common_arg(
+        {"--final-answer-grammar-file"}, "FNAME",
+        "file to read the final answer grammar from",
+        [](common_params & params, const std::string & value) {
+            params.sampling.final_answer_grammar = {COMMON_GRAMMAR_TYPE_USER, read_file(value)};
         }
     ).set_sampling());
     add_opt(common_arg(
@@ -2700,6 +2745,13 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         // we define this arg on both COMMON and EXPORT_LORA, so when showing help message of export-lora, it will be categorized as "example-specific" arg
     ).set_examples({LLAMA_EXAMPLE_COMMON, LLAMA_EXAMPLE_EXPORT_LORA}));
     add_opt(common_arg(
+        {"--mol-config"}, "FNAME",
+        "path to Mixture-of-LoRA orchestration config (JSON); enables request-level LoRA routing",
+        [](common_params & params, const std::string & value) {
+            params.mol_config_path = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    add_opt(common_arg(
         {"--control-vector"}, "FNAME",
         "add a control vector\nnote: use comma-separated values to add multiple control vectors",
         [](common_params & params, const std::string & value) {
@@ -3285,6 +3337,15 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.endpoint_props = true;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_ENDPOINT_PROPS"));
+    add_opt(common_arg(
+        {"--log-requests"},
+        string_format("log full HTTP request/response bodies for every route via the server logger, "
+            "for debugging what was actually sent/received - noisy, off by default (default: %s)",
+            params.log_requests ? "enabled" : "disabled"),
+        [](common_params & params) {
+            params.log_requests = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_LOG_REQUESTS"));
     add_opt(common_arg(
         {"--slots"},
         {"--no-slots"},

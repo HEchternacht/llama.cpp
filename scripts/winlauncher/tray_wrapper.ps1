@@ -63,15 +63,15 @@ $timer.add_Tick({
         $script:hidden = $true
     }
     if ($WatchVibe) {
-        # agents: vibe (vibe.exe) and pi (node.exe running pi-coding-agent cli)
-        $agents = @(Get-Process vibe -ErrorAction SilentlyContinue).Count
+        # agents: vibe (vibe.exe), hermes (hermes.exe) and pi (node.exe running pi-coding-agent cli)
+        $agents = @(Get-Process vibe, hermes -ErrorAction SilentlyContinue).Count
         if ($agents -eq 0 -and @(Get-Process node -ErrorAction SilentlyContinue).Count -gt 0) {
             $agents = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'pi-coding-agent' }).Count
         }
         if ($agents -gt 0) {
             $script:vibeSeen = $true
         } elseif ($script:vibeSeen) {
-            $icon.ShowBalloonTip(2000, "llama.cpp", "All vibe/pi instances closed - shutting down server", 'Info')
+            $icon.ShowBalloonTip(2000, "llama.cpp", "All vibe/pi/hermes instances closed - shutting down server", 'Info')
             Stop-ServerTree
             [System.Windows.Forms.Application]::Exit()
         }

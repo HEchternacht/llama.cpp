@@ -2,8 +2,12 @@
 # Usage:  powershell -ExecutionPolicy Bypass -File install.ps1 [-Target <dir>]
 #   -Target  where the server runs from (default: <repo>\build\bin\Release)
 # Registers (HKCU, no admin needed):
-#   "Open in Pi"  / "Open in Vibe"  - folder and folder-background right-click
+#   "Open in Pi"  / "Open in Hermes"  - folder and folder-background right-click
 #   "LLM Config"  - folder and folder-background right-click
+# Vibe is intentionally NOT registered here - dropped in favor of Hermes in
+# Windows 11's undocumented 3-item "Open with" main-menu bucket (no registry
+# value controls which verbs win that slot; removing a competitor is the only
+# lever). Vibe is still launchable directly via vibe_open.bat.
 param(
     [string]$Target = ""
 )
@@ -29,19 +33,24 @@ Get-ChildItem $here -File | Where-Object { $_.Name -ne "install.ps1" } | ForEach
 }
 New-Item -ItemType Directory -Force (Join-Path $Target "cache") | Out-Null
 
-function Add-Menu($keyName, $label, $command) {
+function Add-Menu($keyName, $label, $command, $icon) {
     foreach ($root in @("HKCU:\Software\Classes\Directory\shell", "HKCU:\Software\Classes\Directory\Background\shell")) {
         $arg = if ($root -like "*Background*") { "%V" } else { "%1" }
         $key = "$root\$keyName"
         New-Item -Path "$key\command" -Force | Out-Null
         Set-ItemProperty -Path $key -Name "(default)" -Value $label
+        if ($icon) { Set-ItemProperty -Path $key -Name "Icon" -Value $icon }
         Set-ItemProperty -Path "$key\command" -Name "(default)" -Value ($command -replace "%ARG%", $arg)
     }
     Write-Host "context menu: $label"
 }
 
-Add-Menu "pi"        "Open in Pi"    "cmd /k call `"$Target\pi_open.bat`" `"%ARG%`""
-Add-Menu "vibe"      "Open in Vibe"  "cmd /k call `"$Target\vibe_open.bat`" `"%ARG%`""
-Add-Menu "llmconfig" "LLM Config"    "wscript.exe `"$Target\llm_config.vbs`""
+foreach ($root in @("HKCU:\Software\Classes\Directory\shell", "HKCU:\Software\Classes\Directory\Background\shell")) {
+    Remove-Item -Path "$root\vibe" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Add-Menu "pi"        "Open in Pi"      "cmd /k call `"$Target\pi_open.bat`" `"%ARG%`""       "$Target\pi.ico"
+Add-Menu "hermes"    "Open in Hermes"  "cmd /k call `"$Target\hermes_open.bat`" `"%ARG%`""   "$Target\hermes.ico"
+Add-Menu "llmconfig" "LLM Config"      "wscript.exe `"$Target\llm_config.vbs`""              "$Target\llmconfig.ico"
 
 Write-Host "`nDone. Target: $Target"

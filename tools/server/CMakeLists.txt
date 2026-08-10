@@ -21,6 +21,8 @@ add_library(${TARGET} STATIC
     server-tools.h
     server-schema.cpp
     server-schema.h
+    server-mol.cpp
+    server-mol.h
 )
 
 if (BUILD_SHARED_LIBS)

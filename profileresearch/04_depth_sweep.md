@@ -1,0 +1,16 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 6140 MiB):
+  Device 0: NVIDIA GeForce RTX 4050 Laptop GPU, compute capability 8.9, VMM: yes, VRAM: 6140 MiB
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 6140 MiB):
+  Device 0: NVIDIA GeForce RTX 4050 Laptop GPU, compute capability 8.9, VMM: yes, VRAM: 6140 MiB
+load_backend: loaded CUDA backend from C:\Users\henri\OneDrive\Área de Trabalho\source_llama\llama.cpp\build\bin\Release\ggml-cuda.dll
+load_backend: loaded RPC backend from C:\Users\henri\OneDrive\Área de Trabalho\source_llama\llama.cpp\build\bin\Release\ggml-rpc.dll
+load_backend: loaded CPU backend from C:\Users\henri\OneDrive\Área de Trabalho\source_llama\llama.cpp\build\bin\Release\ggml-cpu-alderlake.dll
+| model                          |       size |     params | backend    | ngl |  n_cpu_moe | threads | n_ubatch | type_k | type_v |  fa | mmap |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | ---------: | ------: | -------: | -----: | -----: | --: | ---: | --------------: | -------------------: |
+| qwen35moe 35B.A3B Q4_K - Medium |  15.39 GiB |    34.66 B | CUDA,CUDA  |  99 |         36 |       6 |     2048 |   q8_0 |   q8_0 |   1 |    0 |            tg64 |         35.78 ± 1.12 |
+| qwen35moe 35B.A3B Q4_K - Medium |  15.39 GiB |    34.66 B | CUDA,CUDA  |  99 |         36 |       6 |     2048 |   q8_0 |   q8_0 |   1 |    0 |    tg64 @ d4096 |         36.67 ± 0.31 |
+| qwen35moe 35B.A3B Q4_K - Medium |  15.39 GiB |    34.66 B | CUDA,CUDA  |  99 |         36 |       6 |     2048 |   q8_0 |   q8_0 |   1 |    0 |   tg64 @ d16384 |         33.22 ± 0.94 |
+| qwen35moe 35B.A3B Q4_K - Medium |  15.39 GiB |    34.66 B | CUDA,CUDA  |  99 |         36 |       6 |     2048 |   q8_0 |   q8_0 |   1 |    0 |   tg64 @ d32768 |         30.93 ± 0.12 |
+| qwen35moe 35B.A3B Q4_K - Medium |  15.39 GiB |    34.66 B | CUDA,CUDA  |  99 |         36 |       6 |     2048 |   q8_0 |   q8_0 |   1 |    0 |   tg64 @ d65536 |         26.08 ± 0.10 |
+
+build: fd1a05791 (9852)

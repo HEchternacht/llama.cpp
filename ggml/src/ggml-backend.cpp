@@ -1091,6 +1091,22 @@ static bool ggml_backend_sched_prefetch_init(ggml_backend_sched_t sched, int bac
     return true;
 }
 
+// total slot space needed by the prefetchable weight inputs of a split, 0 if it has none
+static size_t ggml_backend_sched_prefetch_size(ggml_backend_sched_t sched, struct ggml_backend_sched_split * split) {
+    const int b = split->backend_id;
+    const size_t alignment = ggml_backend_buft_get_alignment(sched->bufts[b]);
+
+    size_t size = 0;
+    for (int j = 0; j < split->n_inputs; j++) {
+        if (!ggml_backend_sched_input_prefetchable(sched, split, split->inputs[j])) {
+            continue;
+        }
+        struct ggml_tensor * input_cpy = tensor_copy(split->inputs[j], b, sched->cur_copy);
+        size += GGML_PAD(ggml_backend_buft_get_alloc_size(sched->bufts[b], input_cpy), alignment);
+    }
+    return size;
+}
+
 // assign prefetchable weight inputs to double buffered slots, so that their uploads do not have to wait
 // for the compute of the previous split, and can instead overlap with it
 static void ggml_backend_sched_assign_prefetch(ggml_backend_sched_t sched) {
@@ -1104,15 +1120,7 @@ static void ggml_backend_sched_assign_prefetch(ggml_backend_sched_t sched) {
             continue;
         }
 
-        size_t size = 0;
-        for (int j = 0; j < split->n_inputs; j++) {
-            if (!ggml_backend_sched_input_prefetchable(sched, split, split->inputs[j])) {
-                continue;
-            }
-            struct ggml_tensor * input_cpy = tensor_copy(split->inputs[j], b, sched->cur_copy);
-            const size_t alignment = ggml_backend_buft_get_alignment(sched->bufts[b]);
-            size += GGML_PAD(ggml_backend_buft_get_alloc_size(sched->bufts[b], input_cpy), alignment);
-        }
+        const size_t size = ggml_backend_sched_prefetch_size(sched, split);
         if (size == 0) {
             continue;
         }
@@ -1134,24 +1142,37 @@ static void ggml_backend_sched_assign_prefetch(ggml_backend_sched_t sched) {
             continue;
         }
 
-        // the buffers may still be in use by a previous graph
+        // allocate before freeing, so that a failed regrow leaves the existing slots usable
+        ggml_backend_buffer_t new_bufs[2] = { NULL, NULL };
+        for (int s = 0; s < 2; s++) {
+            new_bufs[s] = ggml_backend_buft_alloc_buffer(sched->bufts[b], buf_size[b]);
+        }
+
+        if (new_bufs[0] == NULL || new_bufs[1] == NULL) {
+            for (int s = 0; s < 2; s++) {
+                ggml_backend_buffer_free(new_bufs[s]);
+            }
+            // keep whatever slots we already have - the splits that no longer fit in them
+            // fall back to the regular copy path below
+            if (sched->prefetch_buffers[b][0] == NULL) {
+                GGML_LOG_WARN("%s: failed to allocate %.2f MiB prefetch buffers for %s, prefetch disabled\n",
+                    __func__, buf_size[b] / 1024.0 / 1024.0, ggml_backend_name(sched->backends[b]));
+                sched->prefetch_unsupported[b] = true;
+            } else {
+                GGML_LOG_WARN("%s: failed to grow %s prefetch buffers to %.2f MiB, keeping 2 x %.2f MiB\n",
+                    __func__, ggml_backend_name(sched->backends[b]), buf_size[b] / 1024.0 / 1024.0,
+                    ggml_backend_buffer_get_size(sched->prefetch_buffers[b][0]) / 1024.0 / 1024.0);
+            }
+            continue;
+        }
+
+        // the old buffers may still be in use by a previous graph
         ggml_backend_synchronize(sched->backends[b]);
         ggml_backend_synchronize(sched->prefetch_backends[b]);
 
         for (int s = 0; s < 2; s++) {
             ggml_backend_buffer_free(sched->prefetch_buffers[b][s]);
-            sched->prefetch_buffers[b][s] = ggml_backend_buft_alloc_buffer(sched->bufts[b], buf_size[b]);
-        }
-
-        if (sched->prefetch_buffers[b][0] == NULL || sched->prefetch_buffers[b][1] == NULL) {
-            GGML_LOG_WARN("%s: failed to allocate prefetch buffers for %s, prefetch disabled\n",
-                __func__, ggml_backend_name(sched->backends[b]));
-            for (int s = 0; s < 2; s++) {
-                ggml_backend_buffer_free(sched->prefetch_buffers[b][s]);
-                sched->prefetch_buffers[b][s] = NULL;
-            }
-            sched->prefetch_unsupported[b] = true;
-            continue;
+            sched->prefetch_buffers[b][s] = new_bufs[s];
         }
 
         GGML_LOG_INFO("%s: %s prefetch buffers: 2 x %.2f MiB\n",
@@ -1165,12 +1186,16 @@ static void ggml_backend_sched_assign_prefetch(ggml_backend_sched_t sched) {
             continue;
         }
         const int b = split->backend_id;
-        if (sched->prefetch_buffers[b][0] == NULL) {
+        ggml_backend_buffer_t buffer = sched->prefetch_buffers[b][split->prefetch_slot];
+
+        // the slot is missing, or too small because a regrow failed - checked before allocating
+        // anything, so that a split never ends up only partially assigned to a slot
+        if (buffer == NULL ||
+            ggml_backend_buffer_get_size(buffer) < ggml_backend_sched_prefetch_size(sched, split)) {
             split->prefetch_slot = -1;
             continue;
         }
 
-        ggml_backend_buffer_t buffer = sched->prefetch_buffers[b][split->prefetch_slot];
         char * base = (char *) ggml_backend_buffer_get_base(buffer);
         size_t offset = 0;
         for (int j = 0; j < split->n_inputs; j++) {
@@ -1993,8 +2018,10 @@ ggml_backend_sched_t ggml_backend_sched_new(
     sched->n_backends = n_backends;
     sched->n_copies = parallel ? GGML_SCHED_MAX_COPIES : 1;
 
+    // opt-in: the slot buffers cost one max-sized split of device memory each, which is not
+    // always worth it. note that op_offload is only assigned further below, use the argument
     const char * GGML_SCHED_PREFETCH = getenv("GGML_SCHED_PREFETCH");
-    sched->prefetch = GGML_SCHED_PREFETCH == NULL || atoi(GGML_SCHED_PREFETCH) != 0;
+    sched->prefetch = op_offload && GGML_SCHED_PREFETCH != NULL && atoi(GGML_SCHED_PREFETCH) != 0;
 
     const char * GGML_SCHED_PERF = getenv("GGML_SCHED_PERF");
     sched->perf_interval = GGML_SCHED_PERF ? atoi(GGML_SCHED_PERF) : 0;

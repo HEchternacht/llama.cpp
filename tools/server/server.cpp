@@ -210,6 +210,8 @@ int llama_server(common_params & params, int argc, char ** argv) {
         routes.post_lora_adapters          = models_routes->proxy_post;
         routes.get_slots                   = models_routes->proxy_get;
         routes.post_slots                  = models_routes->proxy_post;
+        routes.get_grammar                 = models_routes->proxy_get;
+        routes.post_grammar                = models_routes->proxy_post;
 
         // custom routes for router
         routes.get_props                   = models_routes->get_router_props;
@@ -263,6 +265,11 @@ int llama_server(common_params & params, int argc, char ** argv) {
     // Save & load slots
     ctx_http.get ("/slots",                    ex_wrapper(routes.get_slots));
     ctx_http.post("/slots/:id_slot",           ex_wrapper(routes.post_slots));
+    // Runtime grammar management
+    ctx_http.get ("/grammar",                  ex_wrapper(routes.get_grammar));
+    ctx_http.post("/grammar",                  ex_wrapper(routes.post_grammar));
+    ctx_http.get ("/v1/grammar",               ex_wrapper(routes.get_grammar));
+    ctx_http.post("/v1/grammar",               ex_wrapper(routes.post_grammar));
 
     // resumable streaming, the conversation_id is the session identity end to end. router and
     // child wire different handlers under the same paths: a child binds the local session
