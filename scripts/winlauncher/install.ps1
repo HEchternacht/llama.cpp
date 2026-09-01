@@ -2,7 +2,7 @@
 # Usage:  powershell -ExecutionPolicy Bypass -File install.ps1 [-Target <dir>]
 #   -Target  where the server runs from (default: <repo>\build\bin\Release)
 # Registers (HKCU, no admin needed):
-#   "Open in Pi"  / "Open in Hermes"  - folder and folder-background right-click
+#   "Open in Pi"  / "Open in Hermes" / "Open in OMP" - folder and folder-background right-click
 #   "LLM Config"  - folder and folder-background right-click
 # Vibe is intentionally NOT registered here - dropped in favor of Hermes in
 # Windows 11's undocumented 3-item "Open with" main-menu bucket (no registry
@@ -51,6 +51,7 @@ foreach ($root in @("HKCU:\Software\Classes\Directory\shell", "HKCU:\Software\Cl
 
 Add-Menu "pi"        "Open in Pi"      "cmd /k call `"$Target\pi_open.bat`" `"%ARG%`""       "$Target\pi.ico"
 Add-Menu "hermes"    "Open in Hermes"  "cmd /k call `"$Target\hermes_open.bat`" `"%ARG%`""   "$Target\hermes.ico"
+Add-Menu "omp"       "Open in OMP"     "cmd /k call `"$Target\omp_open.bat`" `"%ARG%`""      "$env:LOCALAPPDATA\omp\omp.exe,0"
 Add-Menu "llmconfig" "LLM Config"      "wscript.exe `"$Target\llm_config.vbs`""              "$Target\llmconfig.ico"
 
 Write-Host "`nDone. Target: $Target"

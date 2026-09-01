@@ -417,7 +417,11 @@ server_models::server_models(
     unset_reserved_args(base_preset, true);
     // set binary path
     try {
-        bin_path = get_server_exec_path().string();
+        // u8string(), not string(): on Windows path::string() narrows via the ANSI
+        // codepage, but subprocess.h converts argv with MultiByteToWideChar(CP_UTF8).
+        // A non-ASCII install path would otherwise produce invalid UTF-8 and the
+        // child spawn fails with "failed to spawn server instance".
+        bin_path = get_server_exec_path().u8string();
     } catch (const std::exception & e) {
         bin_path = argv[0];
         LOG_WRN("failed to get server executable path: %s\n", e.what());
