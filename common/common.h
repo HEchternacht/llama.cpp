@@ -1120,7 +1120,9 @@ const char * const LLM_KV_SPLIT_TENSORS_COUNT = "split.tensors.count";
 // MoE utils
 //
 
-const char * const LLM_FFN_EXPS_REGEX = "\\.ffn_(up|down|gate|gate_up)_(ch|)exps";
+// attn_v_exps are k2-horizon's MoVA value experts -- expert weights like the ffn
+// ones, so --cpu-moe / -ncmoe has to move them too, or 4 GiB stays on the GPU
+const char * const LLM_FFN_EXPS_REGEX = "\\.(ffn_(up|down|gate|gate_up)_(ch|)exps|attn_v_exps)";
 
 inline std::string llm_ffn_exps_block_regex(int idx) {
     return string_format("blk\\.%d%s", idx, LLM_FFN_EXPS_REGEX);
