@@ -1276,6 +1276,212 @@ static common_chat_params common_chat_params_init_qwen3_coder(const common_chat_
     return data;
 }
 
+// K2 Horizon (IFM) - the jinja template opens the reasoning tag as part of the generation
+// prompt, so the model emits only the closing tag. reasoning_effort selects which of the three
+// think tags is used (high/medium/low -> think/think_fast/think_faster), and tool calls arrive
+// wrapped in a single <ifm|tool_calls> block. The template renders the calls in one of three
+// argument encodings - xml (the default), xml_typed (xml plus an <ifm|arg_type>) and json - so
+// the parser accepts all three.
+static common_chat_params common_chat_params_init_k2_horizon(const common_chat_template &          tmpl,
+                                                             const autoparser::generation_params & inputs) {
+    common_chat_params data;
+
+    const std::string GEN_PREFIX = "<|ifm|im_start|>assistant\n";
+
+    const std::string CALLS_OPEN  = "<ifm|tool_calls>";
+    const std::string CALLS_CLOSE = "</ifm|tool_calls>";
+    const std::string CALL_OPEN   = "<ifm|tool_call>";
+    const std::string CALL_CLOSE  = "</ifm|tool_call>";
+    const std::string VALUE_CLOSE = "</ifm|arg_value>";
+    const std::string TYPE_CLOSE  = "</ifm|arg_type>";
+
+    const std::vector<std::string> THINK_OPEN  = { "<ifm|think>",  "<ifm|think_fast>",  "<ifm|think_faster>"  };
+    const std::vector<std::string> THINK_CLOSE = { "</ifm|think>", "</ifm|think_fast>", "</ifm|think_faster>" };
+
+    data.prompt            = common_chat_template_direct_apply_impl(tmpl, inputs);
+    data.generation_prompt = common_chat_template_generation_prompt_impl(tmpl, inputs);
+    data.format            = COMMON_CHAT_FORMAT_PEG_NATIVE;
+    data.supports_thinking = true;
+
+    data.thinking_start_tag = THINK_OPEN[0];
+    data.thinking_end_tags  = THINK_CLOSE;
+
+    data.preserved_tokens = {
+        "<|ifm|im_start|>",
+        "<|ifm|im_end|>",
+        CALLS_OPEN,
+        CALLS_CLOSE,
+        CALL_OPEN,
+        CALL_CLOSE,
+        "<ifm|arg_key>",
+        "</ifm|arg_key>",
+        "<ifm|arg_type>",
+        TYPE_CLOSE,
+        "<ifm|arg_value>",
+        VALUE_CLOSE,
+    };
+    for (const auto & tag : THINK_OPEN) {
+        data.preserved_tokens.push_back(tag);
+    }
+    for (const auto & tag : THINK_CLOSE) {
+        data.preserved_tokens.push_back(tag);
+    }
+
+    data.message_delimiters = {
+        { COMMON_CHAT_ROLE_ASSISTANT, "<|ifm|im_start|>assistant" },
+        { COMMON_CHAT_ROLE_TOOL,      "<|ifm|im_start|>tool"      },
+        { COMMON_CHAT_ROLE_USER,      "<|ifm|im_start|>user"      },
+        { COMMON_CHAT_ROLE_SYSTEM,    "<|ifm|im_start|>system"    },
+    };
+
+    auto has_tools           = inputs.tools.is_array() && !inputs.tools.empty();
+    auto has_response_format = inputs.json_schema.is_object() && !inputs.json_schema.empty();
+    auto extract_reasoning   = inputs.reasoning_format != COMMON_REASONING_FORMAT_NONE;
+    auto include_grammar     = has_response_format || (has_tools && inputs.tool_choice != COMMON_CHAT_TOOL_CHOICE_NONE);
+
+    if (inputs.has_continuation()) {
+        const auto & msg = inputs.continue_msg;
+
+        data.generation_prompt = GEN_PREFIX + THINK_OPEN[0] + "\n" + msg.reasoning_content;
+        if (inputs.continue_final_message == COMMON_CHAT_CONTINUATION_CONTENT) {
+            data.generation_prompt += "\n" + THINK_CLOSE[0] + "\n" + msg.render_content();
+        }
+
+        data.prompt += data.generation_prompt;
+    }
+
+    auto parser = build_chat_peg_parser([&](common_chat_peg_builder & p) {
+        auto generation_prompt = p.literal(GEN_PREFIX);
+
+        std::vector<common_peg_parser> think_open_choices;
+        for (const auto & tag : THINK_OPEN) {
+            think_open_choices.push_back(p.literal(tag));
+        }
+
+        std::vector<common_peg_parser> think_close_choices;
+        for (const auto & tag : THINK_CLOSE) {
+            think_close_choices.push_back(p.literal(tag));
+        }
+
+        // the model can start a tool call without closing the think block
+        auto reasoning_stops = THINK_CLOSE;
+        reasoning_stops.push_back(CALLS_OPEN);
+
+        // the opening tag is emitted by the template, so it sits in the generation prompt
+        auto reasoning = extract_reasoning ?
+            p.optional(p.choice(think_open_choices) + p.space() +
+                       p.reasoning(p.until_one_of(reasoning_stops)) +
+                       p.optional(p.choice(think_close_choices))) :
+            p.eps();
+
+        if (has_response_format) {
+            return generation_prompt +
+                   (reasoning << p.content(p.schema(p.json(), "response-format-schema", inputs.json_schema)));
+        }
+
+        if (!has_tools || inputs.tool_choice == COMMON_CHAT_TOOL_CHOICE_NONE) {
+            return generation_prompt + (reasoning << p.content(p.rest()));
+        }
+
+        auto arg_close  = p.tool_arg_close(p.literal(VALUE_CLOSE));
+        auto arg_string = p.rule("k2-arg-string",
+            p.ac(p.tool_arg_string_value(p.until(VALUE_CLOSE)) + arg_close, VALUE_CLOSE));
+
+        auto tool_choice = p.choice();
+        foreach_function(inputs.tools, [&](const json & tool) {
+            const auto & function   = tool.at("function");
+            std::string  name       = function.at("name");
+            auto         parameters = function.contains("parameters") ? function.at("parameters") : json::object();
+
+            auto schema_info = common_schema_info();
+            schema_info.resolve_refs(parameters);
+
+            std::vector<common_peg_parser> required_args;
+            std::vector<common_peg_parser> optional_args;
+
+            foreach_parameter(function, [&](const std::string & param_name, const json & param_schema, bool is_required) {
+                auto rule_name = "tool-" + name + "-arg-" + param_name;
+
+                // xml_typed slots an <ifm|arg_type> between the key and the value
+                auto arg_open = p.tool_arg_open(
+                    "<ifm|arg_key>" + p.tool_arg_name(p.literal(param_name)) + "</ifm|arg_key>" + p.space() +
+                    p.optional(p.literal("<ifm|arg_type>") + p.chars("[^<]", 1, -1) + p.literal(TYPE_CLOSE) + p.space()) +
+                    p.literal("<ifm|arg_value>"));
+
+                auto arg_value = schema_info.resolves_to_string(param_schema) ?
+                    arg_string :
+                    p.tool_arg_json_value(p.schema(p.json(), rule_name + "-schema", param_schema)) + arg_close;
+
+                // the template puts a newline after every </ifm|arg_value>, including the last
+                auto arg_rule = p.rule(rule_name, p.tool_arg(arg_open + arg_value) + p.space());
+
+                (is_required ? required_args : optional_args).push_back(arg_rule);
+            });
+
+            auto args = p.permute("tool-" + name + "-args", required_args);
+            if (!optional_args.empty()) {
+                args = args + p.zero_or_more(p.choice(optional_args));
+            }
+
+            // xml / xml_typed: <ifm|tool_call>NAME\n<ifm|arg_key>...
+            auto xml_call = p.tool(
+                p.tool_open(p.literal(CALL_OPEN) + p.tool_name(p.literal(name)) + p.space()) +
+                p.tool_args(args) +
+                p.tool_close(p.literal(CALL_CLOSE)));
+
+            // json: <ifm|tool_call>{"name": "NAME", "arguments": {...}}</ifm|tool_call>
+            auto json_call = p.tool(
+                p.tool_open(p.literal(CALL_OPEN + "{") + p.space() +
+                            p.literal("\"name\"") + p.space() + p.literal(":") + p.space() +
+                            p.literal("\"") + p.tool_name(p.literal(name)) + p.literal("\"") + p.space() +
+                            p.literal(",") + p.space() +
+                            p.literal("\"arguments\"") + p.space() + p.literal(":") + p.space()) +
+                p.tool_args(p.schema(p.json(), "tool-" + name + "-schema", parameters)) +
+                p.tool_close(p.space() + p.literal("}" + CALL_CLOSE)));
+
+            tool_choice |= p.rule("tool-" + name, xml_call | json_call);
+        });
+
+        auto min_calls = inputs.tool_choice == COMMON_CHAT_TOOL_CHOICE_REQUIRED ? 1 : 0;
+
+        // every call lives inside one <ifm|tool_calls> block, each preceded by a newline
+        auto one_call  = p.rule("k2-tool-call", p.space() + tool_choice);
+        auto call_list = inputs.parallel_tool_calls ? p.repeat(one_call, 1, -1) : one_call;
+
+        auto tool_calls = p.trigger_rule("k2-tool-calls",
+            p.repeat(p.literal(CALLS_OPEN) + call_list + p.space() + p.literal(CALLS_CLOSE), min_calls, 1));
+
+        return generation_prompt + (reasoning << p.content(p.until(CALLS_OPEN)) << tool_calls);
+    });
+
+    data.parser = parser.save();
+
+    if (include_grammar) {
+        data.grammar_lazy = has_tools && inputs.tool_choice == COMMON_CHAT_TOOL_CHOICE_AUTO;
+
+        data.grammar = build_grammar([&](const common_grammar_builder & builder) {
+            foreach_function(inputs.tools, [&](const json & tool) {
+                const auto & function = tool.at("function");
+                auto         schema   = function.contains("parameters") ? function.at("parameters") : json::object();
+                builder.resolve_refs(schema);
+            });
+            if (has_response_format) {
+                auto schema = inputs.json_schema;
+                builder.resolve_refs(schema);
+            }
+            parser.build_grammar(builder, data.grammar_lazy);
+        });
+
+        if (data.grammar_lazy) {
+            data.grammar_triggers = {
+                { COMMON_GRAMMAR_TRIGGER_TYPE_WORD, CALLS_OPEN }
+            };
+        }
+    }
+
+    return data;
+}
+
 static common_chat_params common_chat_params_init_gpt_oss(const common_chat_template &    tmpl,
                                                           const autoparser::generation_params & inputs) {
     common_chat_params data;
@@ -3278,6 +3484,14 @@ std::optional<common_chat_params> common_chat_try_specialized_template(
         src.find("<|tool_call_begin|>") != std::string::npos) {
         LOG_DBG("Using specialized template: Kimi K2 Thinking\n");
         return common_chat_params_init_kimi_k2(tmpl, params);
+    }
+
+    // K2 Horizon (IFM) - <ifm|...> plain-text markup for reasoning and tool calls, wrapped in
+    // <|ifm|im_start|>/<|ifm|im_end|> turn tokens. Both markers together are unique to it.
+    if (src.find("<ifm|tool_calls>") != std::string::npos &&
+        src.find("<|ifm|im_start|>") != std::string::npos) {
+        LOG_DBG("Using specialized template: K2 Horizon\n");
+        return common_chat_params_init_k2_horizon(tmpl, params);
     }
 
     // Cohere2 MoE / North Code - marker-wrapped format with <|START_TEXT|> content and

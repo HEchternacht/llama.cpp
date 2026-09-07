@@ -1091,7 +1091,12 @@ json oaicompat_chat_params_parse(
         auto reasoning_effort = json_value(body, "reasoning_effort", std::string(""));
         if (reasoning_effort == "none") {
             inputs.enable_thinking = false;
-        } // other reasoning_effort values are model-specific and not yet handled
+        } else if (!reasoning_effort.empty() &&
+                   inputs.chat_template_kwargs.find("reasoning_effort") == inputs.chat_template_kwargs.end()) {
+            // other values are model-specific: hand them to the template, which is free to
+            // ignore them (K2 Horizon maps high/medium/low onto its three think tags)
+            inputs.chat_template_kwargs["reasoning_effort"] = json(reasoning_effort).dump();
+        }
     }
 
     inputs.force_pure_content = opt.force_pure_content;

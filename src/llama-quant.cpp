@@ -307,6 +307,10 @@ static bool tensor_allows_quantization(const llama_model_quantize_params * param
     // NOTE: can't use LLM_TN here because the layer number is not known
     quantize &= name.find("ffn_gate_inp.weight") == std::string::npos;
 
+    // do not quantize the MoVA value-expert router (K2 Horizon) - it is tiny and top-k
+    // selection over 64 experts is sensitive to router rounding
+    quantize &= name.find("attn_v_gate.weight") == std::string::npos;
+
     // do not quantize the i32 token-id -> expert-id routing table (DeepSeek-V4)
     quantize &= name.find("ffn_gate_tid2eid.weight") == std::string::npos;
 

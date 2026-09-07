@@ -4676,6 +4676,115 @@ static void test_template_output_peg_parsers(bool detailed_debug) {
             .run();
     }
 
+    // K2 Horizon (IFM) - the template force-opens <ifm|think> in the generation prompt, so model
+    // output starts inside the reasoning block. Tool calls come in xml / xml_typed / json forms.
+    {
+        auto tst = peg_tester("models/templates/k2-horizon.jinja", detailed_debug);
+
+        // Reasoning then content
+        tst.test("I'm thinking</ifm|think>Hello, world!\nWhat's up?")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .expect_reasoning("I'm thinking")
+            .expect_content("Hello, world!\nWhat's up?")
+            .run();
+
+        // xml arguments (the template default)
+        tst.test(
+               "</ifm|think><ifm|tool_calls>\n"
+               "<ifm|tool_call>special_function\n"
+               "<ifm|arg_key>arg1</ifm|arg_key>\n"
+               "<ifm|arg_value>1</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .tools({ special_function_tool })
+            .expect_tool_calls({
+                { "special_function", R"({"arg1":1})", "" },
+            })
+            .run();
+
+        // xml_typed adds an <ifm|arg_type> between key and value
+        tst.test(
+               "</ifm|think><ifm|tool_calls>\n"
+               "<ifm|tool_call>special_function\n"
+               "<ifm|arg_key>arg1</ifm|arg_key>\n"
+               "<ifm|arg_type>integer</ifm|arg_type>\n"
+               "<ifm|arg_value>1</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .tools({ special_function_tool })
+            .expect_tool_calls({
+                { "special_function", R"({"arg1":1})", "" },
+            })
+            .run();
+
+        // json arguments
+        tst.test(
+               "</ifm|think><ifm|tool_calls>\n"
+               "<ifm|tool_call>{\"name\": \"special_function\", \"arguments\": {\"arg1\": 1}}</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .tools({ special_function_tool })
+            .expect_tool_calls({
+                { "special_function", R"({"arg1": 1})", "" },
+            })
+            .run();
+
+        // string argument, written as plain text between the value tags
+        tst.test(
+               "</ifm|think><ifm|tool_calls>\n"
+               "<ifm|tool_call>python\n"
+               "<ifm|arg_key>code</ifm|arg_key>\n"
+               "<ifm|arg_value>print('hey')</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .tools({ python_tool })
+            .expect_tool_calls({
+                { "python", "{\"code\":\"print('hey')\"}", "" },
+            })
+            .run();
+
+        // reasoning, content and a tool call together
+        tst.test(
+               "let me look</ifm|think>On it.<ifm|tool_calls>\n"
+               "<ifm|tool_call>python\n"
+               "<ifm|arg_key>code</ifm|arg_key>\n"
+               "<ifm|arg_value>print(1)</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .tools({ python_tool })
+            .expect_reasoning("let me look")
+            .expect_content("On it.")
+            .expect_tool_calls({
+                { "python", "{\"code\":\"print(1)\"}", "" },
+            })
+            .run();
+
+        // parallel calls inside a single <ifm|tool_calls> block
+        tst.test(
+               "</ifm|think><ifm|tool_calls>\n"
+               "<ifm|tool_call>special_function\n"
+               "<ifm|arg_key>arg1</ifm|arg_key>\n"
+               "<ifm|arg_value>1</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "<ifm|tool_call>python\n"
+               "<ifm|arg_key>code</ifm|arg_key>\n"
+               "<ifm|arg_value>print(2)</ifm|arg_value>\n"
+               "</ifm|tool_call>\n"
+               "</ifm|tool_calls>")
+            .reasoning_format(COMMON_REASONING_FORMAT_AUTO)
+            .parallel_tool_calls(true)
+            .tools({ special_function_tool, python_tool })
+            .expect_tool_calls({
+                { "special_function", R"({"arg1":1})", "" },
+                { "python", "{\"code\":\"print(2)\"}", "" },
+            })
+            .run();
+    }
+
     {
         auto kimi_id_special_func_tool_call =
             simple_assist_msg("", "", "special_function", "{\"arg1\": 1}", "functions.special_function:0");
