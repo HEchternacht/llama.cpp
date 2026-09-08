@@ -51,6 +51,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
     GGML_UNUSED(ml);
     LLAMA_LOAD_LOCALS; // initializing variables basically
 
+    const int64_t n_norm_groups = hparams.n_norm_groups;
+
     // embeddings
     tok_embd = create_tensor(
         tn(LLM_TENSOR_TOKEN_EMBD, "weight"),
@@ -61,8 +63,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
     // final norm and output projection
     output_norm = create_tensor(
         tn(LLM_TENSOR_OUTPUT_NORM, "weight"),
-        {n_embd},
-        0
+        {n_embd / n_norm_groups, n_norm_groups},
+        TENSOR_ALLOW_RESHAPE
     );
 
     // output
@@ -87,8 +89,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
         // attn normalization
         layer.attn_norm = create_tensor(
             tn(LLM_TENSOR_ATTN_NORM, "weight", i),
-            {n_embd},
-            0
+            {n_embd / n_norm_groups, n_norm_groups},
+            TENSOR_ALLOW_RESHAPE
         );
         
         // query and key tensors, always dense. and their optional normalization
@@ -100,8 +102,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
         );
         layer.attn_q_norm = create_tensor(
             tn(LLM_TENSOR_ATTN_Q_NORM, "weight", i),
-            {n_embd_head_k * n_head},
-            TENSOR_NOT_REQUIRED
+            {n_embd_head_k, n_head},
+            TENSOR_NOT_REQUIRED | TENSOR_ALLOW_RESHAPE
         );
 
         // key
@@ -112,8 +114,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
         );
         layer.attn_k_norm = create_tensor(
             tn(LLM_TENSOR_ATTN_K_NORM, "weight", i),
-            {n_embd_k_gqa},
-            TENSOR_NOT_REQUIRED
+            {n_embd_k_gqa / n_head_kv, n_head_kv},
+            TENSOR_NOT_REQUIRED | TENSOR_ALLOW_RESHAPE
         );
 
         // value tensors, possible MoVA
@@ -159,8 +161,8 @@ void llama_model_k2_horizon::load_arch_tensors(llama_model_loader & ml) {
         // FFN normalization
         layer.ffn_norm = create_tensor(
             tn(LLM_TENSOR_FFN_NORM, "weight", i),
-            {n_embd},
-            0
+            {n_embd / n_norm_groups, n_norm_groups},
+            TENSOR_ALLOW_RESHAPE
         );
 
         // MoE stuff
@@ -274,13 +276,18 @@ static ggml_tensor * k2_horizon_group_rms_norm(
     // norm it
     cur = ggml_rms_norm(ctx, cur, eps);
 
-    // bring back shape
-    cur = ggml_reshape_2d(ctx, cur, n_embd, n_tokens);
-
-    // apply the learned normalization weights
+    // Apply the learned weights while still grouped. The weight tensor is loaded
+    // pre-split as {n_embd/n_groups, n_groups} so it broadcasts here directly:
+    // any reshape in between would be its own graph node, and ggml_cuda_can_fuse
+    // requires the MUL to sit at nodes[i+1], so it would cost the RMS_NORM+MUL
+    // fusion on all four norms of every layer.
     if (weight != nullptr) {
+        GGML_ASSERT(weight->ne[0] == n_embd / n_groups && weight->ne[1] == n_groups);
         cur = ggml_mul(ctx, cur, weight);
     }
+
+    // bring back shape
+    cur = ggml_reshape_2d(ctx, cur, n_embd, n_tokens);
 
     return cur;
 }
@@ -361,15 +368,22 @@ ggml_tensor * llama_model_k2_horizon::graph::build_routed_value(
     values = ggml_silu(ctx0, values);
     values = ggml_mul(ctx0, values, selected_weights);
     cb(values, "v_moe_weighted", il);
+    ggml_build_forward_expand(gf, values);
 
-    // sum the multiple value outputs
+    // Sum the selected value outputs. The MUL above plus these views and adds are
+    // the shape CUDA's fused moe-weighted-reduction kernel looks for, but only if
+    // every view is emitted before the first add -- left to the natural DFS order
+    // they interleave (view, add, view, add) and the pattern does not match. Same
+    // ordering build_moe_ffn does for the FFN experts.
     ggml_tensor * value_parts[LLAMA_MAX_EXPERTS] = {};
     for(int64_t i = 0; i < n_used; i++) {
         value_parts[i] = ggml_view_2d(ctx0, values, n_embd_gqa, n_tokens, values->nb[2], i * values->nb[1]);
+        ggml_build_forward_expand(gf, value_parts[i]);
     }
     ggml_tensor * value_out = value_parts[0];
     for (int64_t i = 1; i < n_used; ++i) {
         value_out = ggml_add(ctx0, value_out, value_parts[i]);
+        ggml_build_forward_expand(gf, value_out);
     }
     
     // making it contiguous in case it isn't (for one expert only)
