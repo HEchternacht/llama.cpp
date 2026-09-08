@@ -1306,9 +1306,11 @@ static common_chat_params common_chat_params_init_k2_horizon(const common_chat_t
     data.thinking_start_tag = THINK_OPEN[0];
     data.thinking_end_tags  = THINK_CLOSE;
 
+    // NOTE: the <|ifm|im_start|>/<|ifm|im_end|> turn delimiters are deliberately NOT preserved.
+    // The parser never matches them, and preserving a token makes the server render it into the
+    // visible text (accept_special_token in server-context.cpp), so <|ifm|im_end|> would be
+    // echoed at the end of every reply instead of just ending it.
     data.preserved_tokens = {
-        "<|ifm|im_start|>",
-        "<|ifm|im_end|>",
         CALLS_OPEN,
         CALLS_CLOSE,
         CALL_OPEN,
