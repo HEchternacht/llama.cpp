@@ -11,6 +11,7 @@
 
 #define HTP_GDN_MAX_SV     128
 #define HTP_GDN_CHUNK_SIZE 64
+#define HTP_GDN_MIN_TOKENS 8
 
 #ifndef HMX_FP16_TILE_SIZE
 #define HMX_FP16_TILE_SIZE 2048
@@ -36,13 +37,7 @@ struct htp_gdn_kernel_params {
     uint32_t K;
 
     uint32_t total_rows;
-    uint32_t row_start;
-    uint32_t nrows;
-    uint32_t rows_per_thread;
-
     uint32_t kda;
-    uint32_t state_aligned;
-    uint32_t vtcm_per_thread;
     uint32_t vtcm_size;
     uint32_t state_seq_stride;
     uint32_t state_size_per_snap;
@@ -54,7 +49,6 @@ struct htp_gdn_kernel_params {
     struct fastdiv_values div_k1;
     struct fastdiv_values div_rq3;
     struct fastdiv_values div_rk3;
-    struct fastdiv_values div_n_threads;
 };
 
 #if defined(__cplusplus)
@@ -66,18 +60,21 @@ _Static_assert(sizeof(struct htp_gdn_kernel_params) <= 128, "htp_gdn_kernel_para
 struct htp_gdn_vtcm_layout {
     size_t state_aligned;
     size_t bytes_per_thread;
+    size_t off_state;
     size_t total_bytes;
 };
 
 static inline void htp_gdn_vtcm_layout_build(
-    struct htp_gdn_vtcm_layout * layout,
+    struct htp_gdn_vtcm_layout * L,
     uint32_t S_v,
     uint32_t n_threads
 ) {
     size_t state_bytes = (size_t) S_v * S_v * sizeof(float);
-    layout->state_aligned = hex_round_up(state_bytes, 128);
-    layout->bytes_per_thread = 2 * layout->state_aligned;
-    layout->total_bytes = layout->bytes_per_thread * n_threads;
+    L->state_aligned = hex_round_up(state_bytes, 128);
+    L->bytes_per_thread = 2 * L->state_aligned;
+    size_t off = 0;
+    VTCM_LAYOUT_ALLOC(off, off_state, L->bytes_per_thread * n_threads);
+    L->total_bytes = off;
 }
 
 struct htp_gdn_hmx_vtcm_layout {
@@ -132,7 +129,6 @@ struct htp_gdn_hmx_vtcm_layout {
     size_t off_rows_a;
 
     size_t off_thread_scratch;
-    size_t off_attn_rem;
     size_t off_scales_1;
 
     size_t state_f32_bytes;
@@ -192,8 +188,10 @@ static inline void htp_gdn_hmx_vtcm_layout_build(
 
     VTCM_LAYOUT_ALLOC(off, off_s_state,        bh * state_f32_sz);
     VTCM_LAYOUT_ALLOC(off, off_s_f16,          bh * state_f16_sz);
+    off = hex_align_up(off, HMX_FP16_TILE_SIZE);
     VTCM_LAYOUT_ALLOC(off, off_s_col_tiles,    bh * state_tiles_sz);
     VTCM_LAYOUT_ALLOC(off, off_s_update_f32,   bh * state_f32_sz);
+    off = hex_align_up(off, HMX_FP16_TILE_SIZE);
     VTCM_LAYOUT_ALLOC(off, off_s_update_tiles, bh * state_tiles_sz);
 
     VTCM_LAYOUT_ALLOC(off, off_q_f32[0], bh * dma_chunk_sz);
@@ -222,6 +220,7 @@ static inline void htp_gdn_hmx_vtcm_layout_build(
     VTCM_LAYOUT_ALLOC(off, off_delta_f16,   bh * act_f16_sz);
     VTCM_LAYOUT_ALLOC(off, off_d_f16,       bh * act_f16_sz);
 
+    off = hex_align_up(off, HMX_FP16_TILE_SIZE);
     VTCM_LAYOUT_ALLOC(off, off_q_row_tiles,        bh * tile_64xSv_sz);
     VTCM_LAYOUT_ALLOC(off, off_q_prime_row_tiles,  bh * tile_64xSv_sz);
     VTCM_LAYOUT_ALLOC(off, off_k_row_tiles,        bh * tile_64xSv_sz);
@@ -250,9 +249,10 @@ static inline void htp_gdn_hmx_vtcm_layout_build(
     VTCM_LAYOUT_ALLOC(off, off_rows_a,      bh * row_vecs_sz);
 
     const size_t thread_scratch_sz = 64 * 128;
+    off = hex_align_up(off, HMX_FP16_TILE_SIZE);
     VTCM_LAYOUT_ALLOC(off, off_thread_scratch, nth * thread_scratch_sz);
-    VTCM_LAYOUT_ALLOC(off, off_attn_rem,       nth * (128 * sizeof(float)));
-    VTCM_LAYOUT_ALLOC(off, off_scales_1,       256);
+    off = hex_align_up(off, HMX_FP16_TILE_SIZE);
+    VTCM_LAYOUT_ALLOC(off, off_scales_1,       HMX_FP16_TILE_SIZE);
 
     L->total_bytes = off;
 }

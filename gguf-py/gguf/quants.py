@@ -654,28 +654,43 @@ class TQ2_0(__Quant, qtype=GGMLQuantizationType.TQ2_0):
         return (d * qs.astype(np.float32))
 
 
+class Q1_0(__Quant, qtype=GGMLQuantizationType.Q1_0):
+    @classmethod
+    def quantize_blocks(cls, blocks: np.ndarray) -> np.ndarray:
+        # sequential sum like the C reference, np.sum uses pairwise summation and can round differently
+        d = np.cumsum(abs(blocks), axis=-1, dtype=np.float32)[..., -1:] / np.float32(cls.block_size)
+        qs = np.packbits(blocks >= 0, axis=-1, bitorder="little")
+
+        d = d.astype(np.float16).view(np.uint8)
+
+        return np.concatenate([d, qs], axis=-1)
+
+    @classmethod
+    def dequantize_blocks(cls, blocks: np.ndarray) -> np.ndarray:
+        d, qs = np.hsplit(blocks, [2])
+
+        d = d.view(np.float16).astype(np.float32)
+
+        qs = np.unpackbits(qs, axis=-1, bitorder="little")
+
+        return np.where(qs != 0, d, -d)
+
+
 class Q2_0(__Quant, qtype=GGMLQuantizationType.Q2_0):
     @classmethod
     def quantize_blocks(cls, blocks: np.ndarray) -> np.ndarray:
         n_blocks = blocks.shape[0]
 
-        # Compute scale as max absolute value per block
-        d = np.abs(blocks).max(axis=-1, keepdims=True)
-
+        d = abs(blocks).max(axis=-1, keepdims=True)
         with np.errstate(divide="ignore"):
             id = np.where(d == 0, 0, 1 / d)
-        qs = np_roundf(blocks * id)
-        qs = np.clip(qs, -1, 2).astype(np.int8) + np.int8(1)
-        qs = qs.astype(np.uint8)
+        qs = (np_roundf(blocks * id) + 1).clip(0, 3).astype(np.uint8)
 
-        # Pack 4 values per byte: [v0:1:0, v1:3:2, v2:5:4, v3:7:6]
-        qs = qs.reshape((n_blocks, -1, 4)) << np.array([0, 2, 4, 6], dtype=np.uint8).reshape((1, 1, 4))
+        qs = qs.reshape((n_blocks, -1, 4)) << np.array([0, 2, 4, 6], dtype=np.uint8)
         qs = qs[..., 0] | qs[..., 1] | qs[..., 2] | qs[..., 3]
-        qs = qs.reshape((n_blocks, -1))
 
         d = d.astype(np.float16).view(np.uint8)
 
-        # Layout: [d (2 bytes), qs (32 bytes)]
         return np.concatenate([d, qs], axis=-1)
 
     @classmethod
@@ -686,8 +701,7 @@ class Q2_0(__Quant, qtype=GGMLQuantizationType.Q2_0):
 
         d = d.view(np.float16).astype(np.float32)
 
-        # Unpack 4 values per byte
-        qs = qs.reshape((n_blocks, -1, 1)) >> np.array([0, 2, 4, 6], dtype=np.uint8).reshape((1, 1, 4))
+        qs = qs.reshape((n_blocks, -1, 1)) >> np.array([0, 2, 4, 6], dtype=np.uint8)
         qs = (qs & 0x03).reshape((n_blocks, -1)).astype(np.int8) - np.int8(1)
 
         return (d * qs.astype(np.float32))

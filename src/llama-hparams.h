@@ -72,15 +72,14 @@ struct llama_hparams {
     uint32_t n_embd;
     uint32_t n_layer_all;
     uint32_t n_layer_nextn = 0;
+    uint32_t n_layer_decision = 0; // trailing blocks that form the decision head
 
     // granite-switch: index of the single-head "router" KV layer that encodes
     // per-token adapter selection. -1 when the model has no such layer.
     int32_t  router_layer = -1;
     uint32_t n_expert = 0;
     uint32_t n_rel_attn_bkts = 0;
-
-    // K2 Horizon MoVA
-    uint32_t n_value_expert = 0;
+    uint32_t n_value_expert      = 0; // MoVA value experts (K2 Horizon)
     uint32_t n_value_expert_used = 0;
 
     // TODO: this needs to be reworked
@@ -141,6 +140,9 @@ struct llama_hparams {
     float f_norm_eps;
     float f_norm_rms_eps;
     float f_norm_group_eps;
+
+    // post norms use their own epsilon
+    float f_post_norm_eps = 0.0f;
 
     float f_attn_logit_softcapping   = 50.0f;
     float f_router_logit_softcapping = 30.0f;
@@ -265,6 +267,12 @@ struct llama_hparams {
     uint32_t dflash_conv_group_size  = 0;
     uint32_t dflash_selector_rank    = 0;
     uint32_t dflash_selector_top_k   = 0;
+    uint32_t lilicorr_hidden_size    = 0;
+    uint32_t lilicorr_candidate_topk = 0;
+    uint32_t lilicorr_num_heads      = 0;
+    uint32_t lilicorr_layers         = 0;
+    float    lilicorr_vector_eps     = 0.0f;
+    float    lilicorr_logit_scale    = 0.0f;
 
     // llama4 smallthinker
     uint32_t n_moe_layer_step        = 0;
@@ -272,6 +280,11 @@ struct llama_hparams {
     uint32_t n_attn_temp_floor_scale = 0;
     float    f_attn_temp_scale       = 0.0f;
     float    f_attn_temp_offset      = 0.0f; // offset position index
+    // use (1 + (pos + offset) / floor_scale) ^ scale instead of the llama4 log form
+    bool     attn_temp_pow           = false;
+
+    // realtime models: number of tokens the output lags behind the audio input
+    uint32_t n_tokens_delay          = 0;
 
     // gemma3n altup
     uint32_t n_altup      = 4; // altup_num_inputs
@@ -295,6 +308,12 @@ struct llama_hparams {
     uint32_t indexer_n_head    = 0;
     uint32_t indexer_head_size = 0;
     uint32_t indexer_top_k     = 0;
+    uint32_t indexer_kpool     = 0; // k-pool size
+    bool     indexer_kpool_select_tail = true;
+    // head-size slots per cached indexer row, the last one holds the pooled key
+    uint32_t indexer_kpool_row = 3;
+    // pools are consecutive cells in sequence order, not runs of consecutive positions
+    bool     indexer_kpool_by_order = false;
     // MSA
     uint32_t indexer_block_size  = 0;
     uint32_t indexer_local_blocks = 0;
@@ -392,6 +411,7 @@ struct llama_hparams {
     std::array<uint32_t, LLAMA_MAX_LAYERS> dspark_target_layers = {};
 
     enum llama_pooling_type      pooling_type            = LLAMA_POOLING_TYPE_NONE;
+    enum llama_pooling_type      pooling_type_cls        = LLAMA_POOLING_TYPE_UNSPECIFIED; // pooling before the classifier head (RANK)
     enum llama_rope_type         rope_type               = LLAMA_ROPE_TYPE_NONE;
     enum llama_rope_scaling_type rope_scaling_type_train = LLAMA_ROPE_SCALING_TYPE_NONE;
 
@@ -403,6 +423,7 @@ struct llama_hparams {
     // llm_ffn_op_type_from_string() in llama-model.cpp, mirroring how
     // rope_scaling_type_train is handled.
     enum llm_ffn_op_type llm_ffn_op;
+    enum ggml_unary_op   act_cls = GGML_UNARY_OP_TANH; // activation of the classifier head (RANK)
 
     // Step35: optional per-layer clamps for (Swi)GLU
     std::array<float, LLAMA_MAX_LAYERS> swiglu_clamp_exp; // clamping for expert FFN
