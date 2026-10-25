@@ -2711,15 +2711,20 @@ struct common_speculative_impl_ngram_map_k : public common_speculative_impl {
             const common_ngram_map & config,
             uint32_t n_seq)
         : common_speculative_impl(config.key_only ? COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K
-            : COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K4V, n_seq, config.size_value)
+            : COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K4V, n_seq,
+            // n_max must cover the widest draft this implementation can ever return, including
+            // the dynamic-lookup ceiling (size_value_max), since it is used to size the output
+            // batch/buffers up front.
+            std::max(config.size_value, config.size_value_max))
     {
         for (uint32_t i = 0; i < n_seq; i++) {
             this->config.push_back(config);
         }
 
         SPC_TRC("adding speculative implementation '%s'\n", common_speculative_type_to_str(this->type).c_str());
-        SPC_TRC("- size_key=%d, size_value=%d, key_only=%d, min_hits=%d\n",
-                config.size_key, config.size_value, config.key_only, config.min_hits);
+        SPC_TRC("- size_key=%d, size_value=%d, key_only=%d, min_hits=%d, size_value_max=%d, size_value_streak=%d\n",
+                config.size_key, config.size_value, config.key_only, config.min_hits,
+                config.size_value_max, config.streak_required);
     }
 
     void begin(llama_seq_id seq_id, const llama_tokens & prompt) override {
@@ -3112,7 +3117,7 @@ static common_ngram_map get_common_ngram_map(
     bool     key_only   = type == COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K;
     uint16_t min_hits   = config.min_hits;
 
-    return common_ngram_map(size_key, size_value, key_only, min_hits);
+    return common_ngram_map(size_key, size_value, key_only, min_hits, config.size_m_max, config.size_m_streak);
 }
 
 static std::unique_ptr<common_speculative_impl_ngram_cache> create_state_ngram_cache(
@@ -3259,11 +3264,12 @@ int32_t common_speculative_n_max(const common_params_speculative * spec) {
             case COMMON_SPECULATIVE_TYPE_NGRAM_SIMPLE:
                 n_max = std::max(n_max, (int32_t) spec->ngram_simple.size_m);
                 break;
+            // dynamic lookup can grow a draft past size_m up to size_m_max
             case COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K:
-                n_max = std::max(n_max, (int32_t) spec->ngram_map_k.size_m);
+                n_max = std::max(n_max, (int32_t) std::max(spec->ngram_map_k.size_m, spec->ngram_map_k.size_m_max));
                 break;
             case COMMON_SPECULATIVE_TYPE_NGRAM_MAP_K4V:
-                n_max = std::max(n_max, (int32_t) spec->ngram_map_k4v.size_m);
+                n_max = std::max(n_max, (int32_t) std::max(spec->ngram_map_k4v.size_m, spec->ngram_map_k4v.size_m_max));
                 break;
             case COMMON_SPECULATIVE_TYPE_NGRAM_MOD:
                 n_max = std::max(n_max, std::max(0, spec->ngram_mod.n_max));

@@ -1,0 +1,120 @@
+version = 1
+
+[paths]
+cache_dir = "C:\\cmodels\\llamactl-cache"
+llama_server_exe = "C:\\Users\\henri\\OneDrive\\Área de Trabalho\\source_llama\\llama.cpp\\build\\bin\\Release\\llama-server.exe"
+models_dir = "C:\\cmodels"
+
+[global]
+args = [ "--jinja", "--flash-attn", "on", "--cache-reuse", "256", "--top-k", "20", "--top-p", "0.95", "--log-timestamps", "--log-colors", "auto", "--prio", "2", "--prio-batch", "2", "--n-predict", "16000", "--cache-ram", "-1", "-lv", "4", "--slot-save-path", "C:\\cmodels\\llamactl-cache" ]
+api_key = "test"
+health_timeout_ms = 120000
+load_drain_timeout_ms = 10000
+max_resident = 1
+max_cache_slots_per_model = 3
+port_range = [ 8081, 8099 ]
+
+[global.env]
+GGML_SCHED_PREFETCH = "1"
+GGML_CUDA_REGISTER_HOST = "1"
+
+[models.bigbang]
+display_name = "BigBang v1 Q5_K_M (orchestration)"
+model_path = "C:\\cmodels\\BigBang-v1.i1-Q5_K_M.gguf"
+args = []
+max_cache_slots = 3
+
+[models.bonsai]
+display_name = "Bonsai 27B Q1_0 (fast/parallel dispatch)"
+model_path = "C:\\cmodels\\Bonsai-27B-Q1_0.gguf"
+args = []
+max_cache_slots = 6
+
+[models.k2horizon]
+display_name = "K2-Horizon MoVA 36B A4B Q4_K_M"
+model_path = "C:\\cmodels\\K2-Horizon-MoVA-36B-A4B-Q4_K_M.gguf"
+args = []
+max_cache_slots = 3
+
+[models.minicpm]
+display_name = "MiniCPM5-2B Q6_K_L (fast/compaction)"
+model_path = "C:\\cmodels\\MiniCPM5-2B-Q6_K_L.gguf"
+args = []
+max_cache_slots = 3
+
+[models.nex]
+display_name = "Nex-N2.5-mini Q5_K_M"
+model_path = "C:\\cmodels\\Nex-N2.5-mini-Q5_K_M.gguf"
+args = []
+max_cache_slots = 3
+
+[models.tripletrouble-v3-q5_k_m]
+display_name = "tripletrouble-v3-q5_k_m"
+model_path = "C:\\cmodels\\tripletrouble-v3-q5_k_m (1).gguf"
+args = []
+
+[models.fx-work-i1-q5_k_m]
+display_name = "Fx-Work.i1-Q5_K_M"
+model_path = "C:\\cmodels\\Fx-Work.i1-Q5_K_M.gguf"
+args = []
+
+[profiles.bigbang-default]
+model = "bigbang"
+args = [ "--gpu-layers", "all", "--n-cpu-moe", "38", "--ctx-size", "95000", "--parallel", "1", "--threads", "6", "--poll", "0", "--fit", "off", "--batch-size", "4096", "--ubatch-size", "4096", "--cpu-mask", "0x555", "--cpu-mask-batch", "0x555", "--cpu-strict", "1", "--ctx-checkpoints", "32", "--sse-ping-interval", "-1", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--kv-offload", "--reasoning-temp", "1.0", "--chat-template-file", "C:\\cmodels\\chat_template.jinja", "--temp", "0.6", "--min-p", "0" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.bonsai-default]
+model = "bonsai"
+args = [ "--gpu-layers", "99", "--ctx-size", "55000", "--parallel", "4", "--poll", "50", "--ctx-checkpoints", "8", "--cache-type-k", "q4_0", "--cache-type-v", "q4_0", "--kv-unified", "--reasoning", "on", "--reasoning-temp", "1.0", "--chat-template-kwargs", "{\"enable_thinking\":true,\"preserve_thinking\":true}", "--temp", "0.6", "--repeat-penalty", "1.15" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.k2horizon-default]
+model = "k2horizon"
+args = [ "--gpu-layers", "all", "--n-cpu-moe", "38", "--ctx-size", "65536", "--parallel", "1", "--threads", "6" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.minicpm-default]
+model = "minicpm"
+args = [ "--gpu-layers", "all", "--ctx-size", "65536", "--parallel", "1", "--threads", "6" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.nex-default]
+model = "nex"
+args = [ "-ngl", "all", "--sse-ping-interval", "-1", "--jinja", "-fa", "on", "--models-max", "1", "--prio", "2", "-np", "1", "-c", "72000", "-ncmoe", "40", "--cache-ram", "0", "--fit", "off", "--threads", "6", "--poll", "0", "--prio-batch", "2", "--log-timestamps", "--log-colors", "auto", "-b", "2048", "-ub", "2048", "-C", "0x555", "-Cb", "0x555", "--cpu-strict", "1", "--n-predict", "32000", "--ctx-checkpoints", "32", "--cache-reuse", "256", "-ctk", "f16", "-ctv", "f16", "-lv", "4", "--temp", "0.6", "--top-k", "20", "--top-p", "0.95", "--reasoning-temp", "1.0", "--min-p", "0", "--kv-unified", "--no-mmproj", "--load-mode", "none", "--chat-template-kwargs", "{\"enable_thinking\":true,\"preserve_thinking\":true,\"reasoning_effort\":\"low\"}", "--reasoning-budget", "2000", "--reasoning-budget-message", "That's enough thinking for this round — I'll proceed and come back to any gaps later if needed.", "--spec-type", "ngram-map-k4v", "--spec-ngram-map-k4v-size-n", "12", "--spec-ngram-map-k4v-size-m", "48", "--spec-ngram-map-k4v-min-hits", "1", "--spec-ngram-map-k4v-dynamic-max-m", "128", "--spec-ngram-map-k4v-dynamic-streak", "2" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.nex-default.env]
+LLAMA_MOE_CACHE_MIB = "auto"
+LLAMA_MOE_CACHE_RESERVE_MIB = "-400"
+
+[profiles.tripletrouble-v3-q5_k_m-default]
+model = "tripletrouble-v3-q5_k_m"
+args = [ "-ngl", "all", "--sse-ping-interval", "-1", "--jinja", "-fa", "on", "--models-max", "1", "--prio", "2", "-np", "1", "-c", "72000", "-ncmoe", "40", "--cache-ram", "0", "--fit", "off", "--threads", "6", "--poll", "0", "--prio-batch", "2", "--log-timestamps", "--log-colors", "auto", "-b", "2048", "-ub", "2048", "-C", "0x555", "-Cb", "0x555", "--cpu-strict", "1", "--n-predict", "32000", "--ctx-checkpoints", "32", "--cache-reuse", "256", "-ctk", "f16", "-ctv", "f16", "-lv", "4", "--temp", "0.6", "--top-k", "20", "--top-p", "0.95", "--reasoning-temp", "1.0", "--min-p", "0", "--kv-unified", "--no-mmproj", "--load-mode", "none", "--chat-template-kwargs", "{\"enable_thinking\":true,\"preserve_thinking\":true,\"reasoning_effort\":\"low\"}", "--reasoning-budget", "2000", "--reasoning-budget-message", "That's enough thinking for this round — I'll proceed and come back to any gaps later if needed.", "--spec-type", "ngram-map-k4v", "--spec-ngram-map-k4v-size-n", "12", "--spec-ngram-map-k4v-size-m", "48", "--spec-ngram-map-k4v-min-hits", "1", "--spec-ngram-map-k4v-dynamic-max-m", "128", "--spec-ngram-map-k4v-dynamic-streak", "2" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.tripletrouble-v3-q5_k_m-default.env]
+LLAMA_MOE_CACHE_MIB = "auto"
+LLAMA_MOE_CACHE_RESERVE_MIB = "-400"
+
+[profiles.fx-work-i1-q5_k_m-default]
+model = "fx-work-i1-q5_k_m"
+args = [ "-ngl", "all", "--sse-ping-interval", "-1", "--jinja", "-fa", "on", "--models-max", "1", "--prio", "2", "-np", "1", "-c", "72000", "-ncmoe", "40", "--cache-ram", "0", "--fit", "off", "--threads", "6", "--poll", "0", "--prio-batch", "2", "--log-timestamps", "--log-colors", "auto", "-b", "2048", "-ub", "2048", "-C", "0x555", "-Cb", "0x555", "--cpu-strict", "1", "--n-predict", "32000", "--ctx-checkpoints", "32", "--cache-reuse", "256", "-ctk", "f16", "-ctv", "f16", "-lv", "4", "--temp", "0.6", "--top-k", "20", "--top-p", "0.95", "--reasoning-temp", "1.0", "--min-p", "0", "--kv-unified", "--no-mmproj", "--load-mode", "none", "--chat-template-kwargs", "{\"enable_thinking\":true,\"preserve_thinking\":true,\"reasoning_effort\":\"low\"}", "--reasoning-budget", "2000", "--reasoning-budget-message", "That's enough thinking for this round — I'll proceed and come back to any gaps later if needed.", "--spec-type", "ngram-map-k4v", "--spec-ngram-map-k4v-size-n", "12", "--spec-ngram-map-k4v-size-m", "48", "--spec-ngram-map-k4v-min-hits", "1", "--spec-ngram-map-k4v-dynamic-max-m", "128", "--spec-ngram-map-k4v-dynamic-streak", "2" ]
+load_on_startup = false
+prefix_cache_restore = false
+prefix_cache_rebuild = false
+
+[profiles.fx-work-i1-q5_k_m-default.env]
+LLAMA_MOE_CACHE_MIB = "auto"
+LLAMA_MOE_CACHE_RESERVE_MIB = "-400"

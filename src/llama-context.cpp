@@ -598,7 +598,28 @@ llama_context::llama_context(
             moe_cache = std::make_unique<llama_moe_cache>(model, backend_ptrs, backend_buft, cparams.moe_cache_size);
         }
 
+        // fork hybrid MoE cache (hits on GPU, misses on CPU), not combined with the upstream cache above
+        const char * moe_hcache_mib  = model.hparams.no_alloc || moe_cache ? nullptr : getenv("LLAMA_MOE_CACHE_MIB");
+        const bool   moe_hcache_auto = moe_hcache_mib != nullptr && strcmp(moe_hcache_mib, "auto") == 0;
+
+        if (moe_hcache_mib != nullptr && !moe_hcache_auto && atoll(moe_hcache_mib) > 0) {
+            moe_hcache = std::make_unique<llama_moe_hcache>(model, (size_t) atoll(moe_hcache_mib) * 1024 * 1024);
+            if (!moe_hcache->ok()) {
+                moe_hcache.reset();
+            }
+        }
+
         sched_reserve();
+
+        // auto: size the cache from what is left after the compute buffers, then reserve again with it
+        if (moe_hcache_auto) {
+            moe_hcache = std::make_unique<llama_moe_hcache>(model, llama_moe_hcache::BUDGET_AUTO);
+            if (!moe_hcache->ok()) {
+                moe_hcache.reset();
+            } else {
+                sched_reserve();
+            }
+        }
 
         if (!cparams.flash_attn) {
             if (ggml_is_quantized(params.type_v)) {
@@ -2954,6 +2975,7 @@ llm_graph_params llama_context::graph_params(
         /*.cross       =*/ &cross,
         /*.dspark_ctx  =*/ &dspark_ctx,
         /*.moe_cache   =*/ moe_cache.get(),
+        /*.moe_hcache  =*/ moe_hcache.get(),
         /*.prec_policy =*/ &model.prec_policy,
         /*.hdmd        =*/ model.hdmd.rot.empty() ? nullptr : &model.hdmd,
         /*.samplers    =*/ sampling.samplers,

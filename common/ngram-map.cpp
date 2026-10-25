@@ -379,11 +379,23 @@ void common_ngram_map_draft(common_ngram_map & map,
     curr_key.key_num = (uint16_t) std::min((int) map.keys[key_offset].key_num + 1,
             (int) COMMON_NGRAM_MAX_VALUE_COUNT);
 
+    // Dynamic lookup: once a streak of fully-accepted size_value drafts has been observed, a draft
+    // that saturates size_value is grown up to size_value_max tokens, clamped to the context
+    // actually available after the match (cur_len - n - match_pos; always > m, see the match_pos
+    // search bound above).
+    const bool extend_ok = map.size_value_max > m
+        && (map.streak_required == 0 || map.streak_full_accept >= map.streak_required);
+    const size_t max_avail = cur_len - n - match_pos;
+
     if (map.key_only) {
         // simple mode:
         // Fill in the draft with the m tokens following the key.
         // We work with value values[0] only.
         int n_draft_tokens = std::min((int) m, (int) curr_key.values[0].n_accepted);
+
+        if (extend_ok && n_draft_tokens == (int) m) {
+            n_draft_tokens = (int) std::min((size_t) map.size_value_max, max_avail);
+        }
 
         for (int i = 0; i < n_draft_tokens; ++i) {
             draft.push_back(inp[match_pos + n + i]);
@@ -395,6 +407,7 @@ void common_ngram_map_draft(common_ngram_map & map,
         map.last_draft_created   = true;
         map.last_draft_key_idx   = key_offset;
         map.last_draft_value_idx = 0; // value 0 is used for simple mode
+        map.last_draft_len       = draft.size();
         return;
     }
 
@@ -502,6 +515,10 @@ void common_ngram_map_draft(common_ngram_map & map,
     // Fill in the draft with the m tokens following the key.
     int n_draft_tokens = std::min((int) m, (int) curr_key.values[slot_max].n_accepted);
 
+    if (extend_ok && n_draft_tokens == (int) m) {
+        n_draft_tokens = (int) std::min((size_t) map.size_value_max, max_avail);
+    }
+
     for (int i = 0; i < n_draft_tokens; ++i) {
         draft.push_back(inp[match_pos + n + i]);
     }
@@ -513,6 +530,7 @@ void common_ngram_map_draft(common_ngram_map & map,
     map.last_draft_created   = true;
     map.last_draft_key_idx   = key_offset;
     map.last_draft_value_idx = slot_max; // value used for draft generation.
+    map.last_draft_len       = draft.size();
 }
 
 void common_ngram_map_accept(common_ngram_map & map, uint16_t n_accepted) {
@@ -533,4 +551,12 @@ void common_ngram_map_accept(common_ngram_map & map, uint16_t n_accepted) {
     LOG_DBG("common_ngram_map_send_accepted: n_accepted = %d, prev value_num = %d\n",
             n_accepted, curr_value.n_accepted);
     curr_value.n_accepted = n_accepted;
+
+    // dynamic lookup: track consecutive fully-accepted drafts, so common_ngram_map_draft knows
+    // whether to grow the next draft for this map past size_value (see its extend_ok/max_avail).
+    if (map.size_value_max > map.size_value && map.last_draft_len > 0 && n_accepted >= map.last_draft_len) {
+        map.streak_full_accept = (uint16_t) std::min((int) map.streak_full_accept + 1, (int) UINT16_MAX);
+    } else {
+        map.streak_full_accept = 0;
+    }
 }

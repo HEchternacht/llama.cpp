@@ -2098,7 +2098,12 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
         // ensure the previous split's async work has completed before we start
         // this split, the allocator may have reused buffer regions across splits
-        if (split->n_inputs == 0 && prev_backend_id >= 0 && prev_backend_id != split_backend_id) {
+        // a host split after a device split is exempt: device async work never reads or writes host compute buffers
+        // (host -> device input copies are synchronous), and skipping the wait lets both run concurrently
+        const bool host_after_device = prev_backend_id >= 0 &&
+            ggml_backend_dev_type(ggml_backend_get_device(split_backend)) == GGML_BACKEND_DEVICE_TYPE_CPU &&
+            ggml_backend_dev_type(ggml_backend_get_device(sched->backends[prev_backend_id])) != GGML_BACKEND_DEVICE_TYPE_CPU;
+        if (split->n_inputs == 0 && prev_backend_id >= 0 && prev_backend_id != split_backend_id && !host_after_device) {
             if (sched->events[prev_backend_id][sched->cur_copy] != NULL) {
                 ggml_backend_event_synchronize(sched->events[prev_backend_id][sched->cur_copy]);
             } else {

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>llamactl</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <h1>llamactl</h1>
+  <span id="conn-status"><span class="status-dot" id="conn-dot"></span><span id="conn-text" class="muted">connecting...</span></span>
+  <span style="flex:1"></span>
+  <span class="muted" id="api-key-hint"></span>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="models">Models</button>
+  <button data-tab="profiles">Profiles</button>
+  <button data-tab="settings">Settings</button>
+  <button data-tab="logs">Logs</button>
+</nav>
+
+<main>
+  <section class="tab-panel active" id="tab-dashboard">
+    <div class="tiles" id="live-tiles"></div>
+    <div class="tiles" id="dash-tiles"></div>
+
+    <div class="panel">
+      <h2>Realtime (last 2 min)</h2>
+      <canvas class="chart" id="chart-realtime"></canvas>
+    </div>
+
+    <div class="panel" id="current-model-panel" style="display:none">
+      <h2>Current model</h2>
+      <div id="current-model-body"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent requests</h2>
+      <table id="recent-table">
+        <thead><tr><th>Time</th><th>Model</th><th>Prompt</th><th>Cached</th><th>Cache hit</th><th>pp/s</th><th>Gen</th><th>tg/s</th><th>Draft acc.</th><th>Duration</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Recent throughput</h2>
+      <canvas class="chart" id="chart-recent"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>History</h2>
+      <canvas class="chart" id="chart-history"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>Per-model breakdown</h2>
+      <table id="breakdown-table">
+        <thead><tr><th>Model</th><th>Profile</th><th>Requests</th><th>Avg pp/s</th><th>Avg tg/s</th><th>Cache hit</th><th>Draft acc.</th><th>Tokens gen</th><th>Last used</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Error log</h2>
+      <table id="error-table">
+        <thead><tr><th>Time</th><th>Model</th><th>Category</th><th>Message</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-models">
+    <div class="panel">
+      <h2>Models &amp; profiles</h2>
+      <table id="models-table">
+        <thead><tr><th>ID</th><th>Status</th><th>PID</th><th>Port</th><th>Last cache</th><th>Cache size</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel" id="model-config-panel" style="display:none">
+      <h2 id="model-config-title">Model config</h2>
+      <div class="form-row"><label>args (JSON array or raw command-line string)</label><textarea id="model-config-args"></textarea></div>
+      <button class="action primary" id="model-config-save">Save</button>
+      <span class="muted" id="model-config-note"></span>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-profiles">
+    <div class="panel">
+      <h2>Profiles</h2>
+      <table id="profiles-table">
+        <thead><tr><th>ID</th><th>Model</th><th>Args</th><th>Prefix cache</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted">Prefix cache ports the old launcher's "prompt-prefix cache": it keeps the longest stable prefix
+        (system prompt + tool schemas) pre-loaded in slot 0, saving prefill time on every big-agent-tool-context
+        request — separate from the swap cache, which resumes a full conversation after a model swap.
+        <b>Restore</b> loads a saved prefix on startup; <b>Rebuild</b> keeps a background watcher refining it live.</p>
+    </div>
+    <div class="panel" id="profile-edit-panel" style="display:none">
+      <h2 id="profile-edit-title">Edit profile</h2>
+      <div class="form-row"><label>args (JSON array or raw command-line string)</label><textarea id="profile-edit-args"></textarea></div>
+      <div class="form-row"><label>load on startup</label><input type="checkbox" id="profile-edit-startup"></div>
+      <div class="form-row"><label>prefix cache</label>
+        <label><input type="checkbox" id="profile-edit-prefix-restore"> restore</label>
+        <label><input type="checkbox" id="profile-edit-prefix-rebuild"> rebuild</label>
+      </div>
+      <button class="action primary" id="profile-edit-save">Save</button>
+      <button class="action" id="profile-edit-cancel">Cancel</button>
+      <span class="muted" id="profile-edit-note"></span>
+    </div>
+    <div class="panel">
+      <h2>New profile</h2>
+      <div class="form-row"><label>id</label><input id="new-profile-id"></div>
+      <div class="form-row"><label>model</label><select id="new-profile-model"></select></div>
+      <div class="form-row"><label>args (JSON array or raw command-line string)</label><textarea id="new-profile-args">[]</textarea></div>
+      <div class="form-row"><label>prefix cache</label>
+        <label><input type="checkbox" id="new-profile-prefix-restore" checked> restore</label>
+        <label><input type="checkbox" id="new-profile-prefix-rebuild"> rebuild</label>
+      </div>
+      <button class="action primary" id="new-profile-create">Create</button>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-settings">
+    <div class="panel">
+      <h2>Startup</h2>
+      <div class="form-row"><label>Load on startup</label><select id="cfg-startup-profile"><option value="">(none)</option></select></div>
+      <button class="action primary" id="cfg-startup-save">Save</button>
+      <span class="muted" id="cfg-startup-note"></span>
+    </div>
+    <div class="panel">
+      <h2>Models folder</h2>
+      <div class="form-row"><label>models_dir</label><input id="cfg-models-dir" style="width:400px"></div>
+      <button class="action primary" id="cfg-models-dir-save">Save</button>
+      <button class="action" id="cfg-models-dir-rescan">Rescan now</button>
+      <span class="muted" id="cfg-models-dir-note"></span>
+    </div>
+    <div class="panel">
+      <h2>Global</h2>
+      <div class="form-row"><label>max_resident</label><input id="cfg-max-resident" type="number" style="width:80px"></div>
+      <div class="form-row"><label>max_cache_slots_per_model</label><input id="cfg-max-cache-slots" type="number" style="width:80px"></div>
+      <div class="form-row"><label>port_range</label><input id="cfg-port-lo" type="number" style="width:80px"> &ndash; <input id="cfg-port-hi" type="number" style="width:80px"></div>
+      <div class="form-row"><label>args (JSON array or raw command-line string)</label><textarea id="cfg-args"></textarea></div>
+      <button class="action primary" id="cfg-save">Save</button>
+      <span class="muted" id="cfg-note"></span>
+    </div>
+    <div class="panel">
+      <h2>Environment</h2>
+      <table id="env-table">
+        <thead><tr><th>On</th><th>Variable</th><th>Value</th><th>Recommended</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="form-row"><textarea id="env-note" readonly rows="3" style="width:100%"></textarea></div>
+      <button class="action primary" id="env-save">Save</button>
+      <button class="action" id="env-restore-recommended">Restore recommended</button>
+      <span class="muted" id="env-note-status"></span>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-logs">
+    <div class="panel">
+      <h2>Child logs</h2>
+      <div class="form-row">
+        <label>Model:profile</label><select id="log-id"></select>
+        <label>File</label><select id="log-file"></select>
+        <label>Lines</label><input id="log-lines" type="number" value="300" style="width:70px">
+        <button class="action primary" id="log-refresh">Refresh</button>
+      </div>
+      <textarea id="log-box" readonly rows="30" style="width:100%;font-family:Consolas,monospace;font-size:12px"></textarea>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

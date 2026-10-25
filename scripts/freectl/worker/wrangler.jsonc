@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "freectl",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // the UI; the Worker runs first so /ui/* is mapped onto these files and the API is never shadowed
+  "assets": { "directory": "../web", "binding": "ASSETS", "run_worker_first": true },
+  "durable_objects": { "bindings": [{ "name": "FREECTL", "class_name": "Freectl" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Freectl"] }],
+  // re-list providers and re-test stale models (Catalog.check)
+  "triggers": { "crons": ["*/30 * * * *"] },
+  "observability": { "enabled": true }
+}

@@ -3,6 +3,7 @@
 #include "llama-impl.h"
 #include "llama-model.h"
 #include "llama-moe-cache.h"
+#include "llama-moe-hcache.h"
 #include "llama-batch.h"
 #include "llama-cparams.h"
 #include "llama-sampler.h"
@@ -1642,6 +1643,7 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     cross            (params.cross),
     dspark_ctx       (params.dspark_ctx),
     moe_cache        (params.moe_cache),
+    moe_hcache       (params.moe_hcache),
     prec_policy      (params.prec_policy),
     hdmd             (params.hdmd),
     samplers         (params.samplers),
@@ -2437,12 +2439,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
         cb(cur, "ffn_moe_weighted", il);
     }
 
+    // expert FFN over (gate_up_exps | up_exps, gate_exps), down_exps for the given expert ids
+    auto build_experts = [&](ggml_tensor * gate_up_exps, ggml_tensor * up_exps, ggml_tensor * gate_exps, ggml_tensor * down_exps,
+                             ggml_tensor * cur, ggml_tensor * selected_experts, ggml_tensor * exp_slots) -> ggml_tensor * {
     ggml_tensor * up = nullptr;
     ggml_tensor * experts = nullptr;
 
     if (gate_up_exps) {
         // merged gate_up path: one mul_mat_id, then split into gate and up views
-        ggml_tensor * gate_up = build_lora_mm_id(gate_up_exps, cur, selected_experts, up_exps_s, slots); // [n_ff*2, n_expert_used, n_tokens]
+        ggml_tensor * gate_up = build_lora_mm_id(gate_up_exps, cur, selected_experts, up_exps_s, exp_slots); // [n_ff*2, n_expert_used, n_tokens]
         cb(gate_up, "ffn_moe_gate_up", il);
 
         if (up_exps_s) {
@@ -2461,7 +2466,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
         cb(up, "ffn_moe_up", il);
     } else {
         // separate gate and up path
-        up = build_lora_mm_id(up_exps, cur, selected_experts, up_exps_s, slots); // [n_ff, n_expert_used, n_tokens]
+        up = build_lora_mm_id(up_exps, cur, selected_experts, up_exps_s, exp_slots); // [n_ff, n_expert_used, n_tokens]
         cb(up, "ffn_moe_up", il);
 
         if (up_exps_s) {
@@ -2474,7 +2479,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
         }
 
         if (gate_exps) {
-            cur = build_lora_mm_id(gate_exps, cur, selected_experts, gate_exps_s, slots); // [n_ff, n_expert_used, n_tokens]
+            cur = build_lora_mm_id(gate_exps, cur, selected_experts, gate_exps_s, exp_slots); // [n_ff, n_expert_used, n_tokens]
             cb(cur, "ffn_moe_gate", il);
         } else {
             cur = up;
@@ -2586,7 +2591,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
             cur = amax_src1.res;
         }
 
-        experts = build_lora_mm_id(down_exps, cur, selected_experts, down_exps_s, slots); // [n_embd, n_expert_used, n_tokens]
+        experts = build_lora_mm_id(down_exps, cur, selected_experts, down_exps_s, exp_slots); // [n_embd, n_expert_used, n_tokens]
         //ggml_prec_set_src(experts, GGML_PREC_BF16, 1); // (see TODO above)
         cb(experts, "ffn_moe_down", il);
 
@@ -2602,6 +2607,55 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
     if (down_exps_b) {
         experts = ggml_add_id(ctx0, experts, down_exps_b, selected_experts);
         cb(experts, "ffn_moe_down_biased", il);
+    }
+
+    return experts;
+    };
+
+    // hybrid expert cache: hits run on the GPU against the VRAM pool, misses on the CPU
+    const llama_moe_hcache::layer * mcl = nullptr;
+    if (moe_hcache && slots == nullptr && !up_exps_b && !gate_exps_b && !down_exps_b && !gate_up_exps_b &&
+        !up_exps_s && !gate_exps_s && !down_exps_s && (loras == nullptr || loras->empty())) {
+        mcl = moe_hcache->get_layer(il, n_tokens);
+        if (mcl) {
+            ggml_tensor * mats[llama_moe_hcache::MAX_MATS] = { gate_up_exps, up_exps, gate_exps, down_exps };
+            for (int m = 0, n = 0; m < llama_moe_hcache::MAX_MATS; ++m) {
+                if (mats[m] && mats[m] != mcl->src[n++]) {
+                    mcl = nullptr;
+                    break;
+                }
+            }
+        }
+    }
+
+    ggml_tensor * experts = nullptr;
+
+    if (mcl) {
+        const auto & g = moe_hcache->groups[mcl->group];
+        ggml_tensor * pool[llama_moe_hcache::MAX_MATS] = {};
+        for (int m = 0, n = 0; m < llama_moe_hcache::MAX_MATS; ++m) {
+            ggml_tensor * mats[llama_moe_hcache::MAX_MATS] = { gate_up_exps, up_exps, gate_exps, down_exps };
+            if (mats[m]) {
+                pool[m] = g.pool[n++];
+            }
+        }
+
+        ggml_tensor * ids_gpu = moe_hcache->build_ids_gpu(ctx0, selected_experts, cur, il);
+        cb(ids_gpu, "ffn_moe_cache_ids_gpu", il);
+        ggml_tensor * ids_cpu = moe_hcache->build_ids_cpu(ctx0, selected_experts, ids_gpu, il);
+        cb(ids_cpu, "ffn_moe_cache_ids_cpu", il);
+        ggml_build_forward_expand(gf, ids_cpu);
+
+        // GPU hits are queued before the CPU misses so that both run concurrently
+        ggml_tensor * experts_gpu = build_experts(pool[0], pool[1], pool[2], pool[3], cur, ids_gpu, nullptr);
+        ggml_build_forward_expand(gf, experts_gpu);
+
+        ggml_tensor * experts_cpu = build_experts(gate_up_exps, up_exps, gate_exps, down_exps, cur, ids_cpu, nullptr);
+
+        experts = ggml_add(ctx0, experts_gpu, experts_cpu);
+        cb(experts, "ffn_moe_cache_sum", il);
+    } else {
+        experts = build_experts(gate_up_exps, up_exps, gate_exps, down_exps, cur, selected_experts, slots);
     }
 
     // an expert output can be scaled by a norm weight, then normalized, before the router weights apply

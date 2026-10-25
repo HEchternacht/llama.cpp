@@ -4483,6 +4483,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.speculative.ngram_map_k.min_hits = value;
         }
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k-dynamic-max-m"}, "N",
+        string_format("dynamic lookup: grow the draft for ngram-map-k past size-m, up to N tokens, "
+            "while it keeps being fully accepted (0 = disabled, default: %d)", params.speculative.ngram_map_k.size_m_max),
+        [](common_params & params, int value) {
+            if (value < 0 || value > 1024) {
+                throw std::invalid_argument("ngram dynamic max M must be between 0 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k.size_m_max = value;
+        }
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k-dynamic-streak"}, "N",
+        string_format("dynamic lookup: consecutive fully-accepted drafts required before growing past "
+            "size-m for ngram-map-k, see --spec-ngram-map-k-dynamic-max-m (default: %d)", params.speculative.ngram_map_k.size_m_streak),
+        [](common_params & params, int value) {
+            if (value < 1) {
+                throw std::invalid_argument("ngram dynamic streak must be at least 1");
+            }
+            params.speculative.ngram_map_k.size_m_streak = value;
+        }
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
     add_opt(common_arg(
         {"--spec-ngram-map-k4v-size-n"}, "N",
@@ -4512,6 +4534,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("ngram min hits must be at least 1");
             }
             params.speculative.ngram_map_k4v.min_hits = value;
+        }
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k4v-dynamic-max-m"}, "N",
+        string_format("dynamic lookup: grow the draft for ngram-map-k4v past size-m, up to N tokens, "
+            "while it keeps being fully accepted (0 = disabled, default: %d)", params.speculative.ngram_map_k4v.size_m_max),
+        [](common_params & params, int value) {
+            if (value < 0 || value > 1024) {
+                throw std::invalid_argument("ngram dynamic max M must be between 0 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k4v.size_m_max = value;
+        }
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k4v-dynamic-streak"}, "N",
+        string_format("dynamic lookup: consecutive fully-accepted drafts required before growing past "
+            "size-m for ngram-map-k4v, see --spec-ngram-map-k4v-dynamic-max-m (default: %d)", params.speculative.ngram_map_k4v.size_m_streak),
+        [](common_params & params, int value) {
+            if (value < 1) {
+                throw std::invalid_argument("ngram dynamic streak must be at least 1");
+            }
+            params.speculative.ngram_map_k4v.size_m_streak = value;
         }
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 

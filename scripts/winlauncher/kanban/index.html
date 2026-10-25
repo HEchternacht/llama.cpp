@@ -1,0 +1,1322 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>kanban - pi multi-model board</title>
+<style>
+:root{
+  --bg:#0d0f14; --panel:#14171f; --panel2:#1a1e29; --panel3:#212636; --line:#2a3042;
+  --fg:#e3e7f0; --dim:#8790a6; --faint:#5d6478;
+  --accent:#6ea8fe; --ok:#4ec98a; --warn:#e6b455; --bad:#e8615f; --run:#b98ce0; --info:#4fb6c8;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:13px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--fg);
+  display:grid;grid-template-columns:210px 1fr;grid-template-rows:100%;overflow:hidden}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;background:var(--panel3);color:var(--fg);border:1px solid var(--line);
+  border-radius:6px;padding:4px 10px;cursor:pointer;transition:border-color .12s,background .12s}
+button:hover:not(:disabled){border-color:var(--accent);background:#252b3d}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{background:#23406e;border-color:#3a5f9e}
+button.danger:hover:not(:disabled){border-color:var(--bad);color:var(--bad)}
+input,textarea,select{font:inherit;background:#090b10;color:var(--fg);border:1px solid var(--line);
+  border-radius:6px;padding:6px 8px;width:100%;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.45}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2c3346;border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------------------------------------------------------------- rail --- */
+#rail{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;
+  overflow:hidden;min-width:0}
+#rail .hd{padding:12px 12px 10px;border-bottom:1px solid var(--line)}
+#rail .hd h1{font-size:15px;letter-spacing:.02em}
+#rail .hd .sub{color:var(--faint);font-size:11px;margin-top:2px}
+#projects{flex:1;overflow:auto;padding:6px}
+.proj{padding:8px 9px;border-radius:7px;cursor:pointer;border:1px solid transparent;margin-bottom:3px}
+.proj:hover{background:var(--panel2)}
+.proj.active{background:var(--panel2);border-color:var(--accent)}
+.proj .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj .p{color:var(--faint);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  direction:rtl;text-align:left}
+.proj .c{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.pill{font-size:10px;padding:0 5px;border-radius:8px;background:#0b0e15;border:1px solid var(--line);
+  color:var(--dim)}
+#rail .ft{padding:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.empty{color:var(--faint);font-size:11px;padding:10px;text-align:center;line-height:1.6}
+
+/* ---------------------------------------------------------------- main --- */
+#main{display:grid;grid-template-rows:auto auto 1fr auto auto;overflow:hidden;min-width:0}
+#top{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);
+  background:var(--panel);flex-wrap:wrap}
+#top .grow{flex:1;min-width:8px}
+#projname{font-weight:600;font-size:14px}
+#objective{color:var(--dim);font-size:11px;max-width:34vw;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.chip{padding:2px 9px;border-radius:11px;border:1px solid var(--line);background:var(--panel2);
+  font-size:11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.chip:hover{border-color:var(--accent)}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.chip.on{border-color:var(--ok);color:var(--ok)} .chip.on .dot{background:var(--ok)}
+.chip.loading{border-color:var(--warn);color:var(--warn)}
+.chip.loading .dot{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);
+  padding:2px 9px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}
+.status .dot{width:7px;height:7px;border-radius:50%}
+.status.live .dot{background:var(--ok)} .status.live{color:var(--ok)}
+.status.dead .dot{background:var(--bad);animation:pulse 1s infinite} .status.dead{color:var(--bad)}
+#note{color:var(--dim);font-size:11px;font-family:var(--mono)}
+#note.busy::before{content:"";display:inline-block;width:8px;height:8px;margin-right:6px;
+  border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;
+  animation:spin .7s linear infinite;vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#banners{display:flex;flex-direction:column}
+.banner{padding:7px 14px;font-size:12px;border-bottom:1px solid var(--line);display:flex;gap:9px;
+  align-items:center}
+.banner.err{background:#2b1416;color:#ffb4b2}
+.banner.warn{background:#2a2213;color:#f0cf8f}
+.banner.info{background:#12222a;color:#a9dbe6}
+.banner .x{margin-left:auto;cursor:pointer;opacity:.6;padding:0 4px}
+.banner .x:hover{opacity:1}
+
+/* --------------------------------------------------------------- board --- */
+#board{display:flex;gap:10px;padding:12px;overflow-x:auto;overflow-y:hidden;min-height:0}
+.col{flex:0 0 232px;display:flex;flex-direction:column;background:var(--panel);
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;min-height:0}
+.col.hot{border-color:#3d4a6b}
+.col h3{padding:8px 11px;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;
+  align-items:center;flex:none}
+.col h3 .n{background:#0b0e15;border-radius:9px;padding:0 6px;font-size:10px}
+.col .body{flex:1;overflow:auto;padding:7px;display:flex;flex-direction:column;gap:7px;min-height:0}
+.card{background:var(--panel2);border:1px solid var(--line);border-left-width:3px;border-radius:7px;
+  padding:8px 10px;cursor:pointer;transition:border-color .12s}
+.card:hover{border-color:var(--accent)}
+.card.sel{border-color:var(--accent);background:var(--panel3)}
+.card .t{font-weight:600;margin-bottom:4px;line-height:1.35}
+.card .t .id{color:var(--faint);font-family:var(--mono);font-size:11px;margin-right:5px}
+.card .m{display:flex;gap:4px;flex-wrap:wrap;font-size:10.5px}
+.card .why{color:var(--warn);font-size:11px;margin-top:5px;line-height:1.4}
+.card .err{color:var(--bad);font-size:11px;margin-top:5px}
+.card .stream{margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  background:#090b10;border-radius:5px;padding:5px 6px;max-height:66px;overflow:hidden;
+  white-space:pre-wrap;word-break:break-word;position:relative}
+.card .bar{height:2px;background:var(--run);border-radius:2px;margin-top:6px;animation:sweep 1.6s infinite}
+@keyframes sweep{0%{opacity:.25}50%{opacity:1}100%{opacity:.25}}
+.s-ready{border-left-color:var(--accent)} .s-running{border-left-color:var(--run)}
+.s-done{border-left-color:var(--ok)} .s-failed{border-left-color:var(--bad)}
+.s-blocked{border-left-color:var(--warn)} .s-needs-decomposition{border-left-color:#e08a4c}
+.s-review,.s-testing{border-left-color:var(--info)} .s-draft{border-left-color:#4a5165}
+.s-cancelled{border-left-color:#4a5165}
+.pill.vpill{border-color:#2b4a55;color:var(--info)}
+.pill.bad{border-color:#5a2b2b;color:var(--bad)}
+
+/* --------------------------------------------------------------- graph --- */
+#graph{display:none;flex:1;overflow:auto;padding:12px;min-height:0}
+body.graphview #board{display:none}
+body.graphview #graph{display:block}
+#graph svg{display:block}
+.gnode rect{stroke-width:1.5px}
+.gnode text{font-size:11px;fill:var(--fg);font-family:var(--mono)}
+.gnode text.sub{font-size:9.5px;fill:var(--dim)}
+.gedge{stroke:var(--line);stroke-width:1.5px;fill:none}
+.gedge.hot{stroke:var(--run)}
+.glane{fill:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+/* the model that will run a group, and which of its slots run together */
+.gmodel{font-size:10px;font-family:var(--mono);letter-spacing:.04em}
+.gbatch{font-size:9px;font-family:var(--mono);opacity:.85}
+.glanebg{fill:#ffffff06}
+
+/* --------------------------------------------------------------- trace --- */
+.trace{background:#090b10;border:1px solid var(--line);border-radius:7px;max-height:300px;
+  overflow:auto;font-family:var(--mono);font-size:11.5px;padding:7px 9px}
+.tr{display:flex;gap:8px;padding:1px 0;white-space:pre-wrap;word-break:break-word}
+.tr .k{flex:none;width:74px;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;
+  padding-top:2px;color:var(--faint)}
+.tr.tool .k{color:var(--accent)} .tr.tool_result .k{color:var(--ok)}
+.tr.turn .k{color:var(--run)} .tr.thinking_done .k{color:var(--dim)}
+.tr .v{flex:1;color:var(--dim)}
+.tr.tool .v{color:var(--fg)}
+/* reasoning is the model's private voice - set apart from what it did */
+.tr.thinking{border-left:2px solid #3a2f52;margin:3px 0 3px -9px;padding-left:7px;
+  background:#ffffff04}
+.tr.thinking .k{color:#b98ce0}
+.tr.thinking .v{color:#9d93b5;font-style:italic}
+.tr.thinking.open .v::after{content:"▍";color:#b98ce0;font-style:normal;
+  animation:blink 1s steps(2,start) infinite}
+@keyframes blink{to{visibility:hidden}}
+
+/* ------------------------------------------------------------- planner --- */
+#planner{border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;
+  max-height:44vh;min-height:0}
+#planner .hd{display:flex;align-items:center;gap:9px;padding:6px 12px;border-bottom:1px solid var(--line);
+  flex:none;font-size:11px;color:var(--dim)}
+#planner .hd b{color:var(--fg);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+#pout{flex:1;overflow:auto;padding:9px 12px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;
+  min-height:0;line-height:1.55}
+#pout.idle{color:var(--faint)}
+#pbar{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--line);flex:none}
+#pmsg{flex:1;font-family:inherit;font-size:12.5px}
+
+/* ------------------------------------------------------------- console --- */
+#console{border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;
+  height:190px;min-height:30px}
+#console.collapsed{height:31px}
+#console .hd{display:flex;align-items:center;gap:9px;padding:5px 12px;border-bottom:1px solid var(--line);
+  cursor:pointer;flex:none;font-size:11px;color:var(--dim)}
+#console .hd b{color:var(--fg);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+#console.collapsed .hd{border-bottom:none}
+#log{flex:1;overflow:auto;padding:5px 12px 9px;font-family:var(--mono);font-size:11.5px;line-height:1.6}
+#console.collapsed #log{display:none}
+.le{display:flex;gap:9px;white-space:pre-wrap;word-break:break-word}
+.le .ts{color:var(--faint);flex:none}
+.le .lv{flex:none;width:52px;text-transform:uppercase;font-size:10px;letter-spacing:.06em;padding-top:1px}
+.lv-ok{color:var(--ok)} .lv-error{color:var(--bad)} .lv-warn{color:var(--warn)}
+.lv-run{color:var(--run)} .lv-sched{color:var(--dim)} .lv-model{color:var(--info)}
+.lv-ui{color:var(--accent)}
+
+/* -------------------------------------------------------------- drawer --- */
+#drawer{position:fixed;top:0;right:0;width:min(620px,66vw);height:100%;background:var(--panel);
+  border-left:1px solid var(--line);display:none;flex-direction:column;box-shadow:-18px 0 50px #000a;
+  z-index:20}
+#drawer.open{display:flex}
+#drawer .hd{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;gap:9px;align-items:center}
+#drawer .hd b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#drawer .bd{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:11px}
+#drawer .ft{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:7px;flex-wrap:wrap}
+.field label{display:block;color:var(--dim);font-size:10.5px;margin-bottom:3px;
+  text-transform:uppercase;letter-spacing:.06em}
+.field .hint{color:var(--faint);font-size:10.5px;margin-top:3px;text-transform:none;letter-spacing:0}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+pre.live{background:#090b10;border:1px solid var(--line);border-radius:7px;padding:9px;
+  max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:11.5px;margin:0;
+  font-family:var(--mono)}
+
+/* --------------------------------------------------------------- modal --- */
+.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;
+  z-index:40;padding:20px}
+.modal.open{display:flex}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:17px;
+  width:520px;max-height:88vh;display:flex;flex-direction:column;gap:11px;overflow:auto}
+.modal h2{font-size:15px}
+.picker{border:1px solid var(--line);border-radius:7px;background:#090b10;height:190px;overflow:auto}
+.picker .it{padding:5px 10px;cursor:pointer;font-family:var(--mono);font-size:11.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .it:hover{background:var(--panel3)}
+.picker .it.up{color:var(--accent)}
+.modal .bar{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.modal .bar .grow{flex:1}
+.err{color:var(--bad);font-size:11.5px}
+
+@media(max-width:900px){
+  body{grid-template-columns:150px 1fr}
+  #objective{display:none}
+}
+</style>
+
+<div id="rail">
+  <div class="hd">
+    <h1>kanban</h1>
+    <div class="sub" id="railsub">pi multi-model board</div>
+  </div>
+  <div id="projects"></div>
+  <div class="ft">
+    <button id="newproj" class="primary">+ New project</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="top">
+    <span id="projname">no project</span>
+    <span id="objective"></span>
+    <span class="grow"></span>
+    <span id="note"></span>
+    <span id="chips"></span>
+    <span class="status" id="conn"><span class="dot"></span><span class="txt">connecting</span></span>
+    <button id="pause">Pause</button>
+    <button id="interrupt" class="danger">Interrupt</button>
+    <button id="viewtoggle">Graph</button>
+    <button id="newtask" class="primary">+ Task</button>
+  </div>
+  <div id="banners"></div>
+  <div id="board"></div>
+  <div id="graph"></div>
+  <div id="planner">
+    <div class="hd">
+      <b>Planner</b>
+      <span id="pstate">bigbang · idle</span>
+      <span style="flex:1"></span>
+      <button id="pcancel" style="display:none">Stop</button>
+    </div>
+    <div id="psteer" style="display:none"></div>
+    <div class="trace" id="ptrace" style="display:none;margin:0 12px"></div>
+    <div id="pout" class="idle"></div>
+    <div id="pbar">
+      <textarea id="pmsg" rows="2" placeholder="Tell the planner what to do — e.g. &quot;plan the work for the objective&quot;, or &quot;T-003 failed, split it up&quot;. Ctrl+Enter to send."></textarea>
+      <button id="psend" class="primary" title="Runs at the next boundary: the current batch finishes first, nothing is killed, no model swap is forced. Ctrl+Enter">Steer plan</button>
+      <button id="pnow" class="danger" title="Kills every running task and the current planner turn, then answers immediately. Costs a model swap.">Interrupt</button>
+    </div>
+  </div>
+
+  <div id="console">
+    <div class="hd" id="conhd">
+      <b>Activity</b>
+      <span id="conlast"></span>
+      <span style="flex:1"></span>
+      <span id="contoggle">▾</span>
+    </div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<div id="drawer">
+  <div class="hd"><b id="dtitle"></b><button id="dclose">close</button></div>
+  <div class="bd" id="dbody"></div>
+  <div class="ft" id="dfoot"></div>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
+
+<script>
+"use strict";
+
+const COLS = [
+  ["Draft",     ["draft"],                          "waiting for you to approve"],
+  ["Blocked",   ["blocked", "needs-decomposition"], "waiting on dependencies or too complex"],
+  ["Ready",     ["ready"],                          "eligible to run"],
+  ["Running",   ["running"],                        "a pi worker is on it"],
+  ["Review",    ["review"],                         "finished, waiting to be checked"],
+  ["Testing",   ["testing"],                        "needs verification"],
+  ["Done",      ["done", "failed", "cancelled"],    "finished"],
+];
+
+let S = null;              // last snapshot
+let openId = null;         // task open in the drawer
+let lastSeq = 0;           // highest activity seq rendered
+const liveText = {};       // "slug:id" -> streamed text
+const dismissed = new Set();
+
+const $ = (s) => document.querySelector(s);
+const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c;
+  if (x !== undefined) n.textContent = x; return n; };
+const hhmmss = (ts) => new Date(ts).toTimeString().slice(0, 8);
+
+// ---------------------------------------------------------------- errors ---
+
+function banner(kind, text, key) {
+  if (key && dismissed.has(key)) return;
+  const box = $("#banners");
+  if (key && box.querySelector('[data-k="' + key + '"]')) return;
+  const b = el("div", "banner " + kind);
+  if (key) b.dataset.k = key;
+  b.appendChild(el("span", null, text));
+  const x = el("span", "x", "✕");
+  x.onclick = () => { if (key) dismissed.add(key); b.remove(); };
+  b.appendChild(x);
+  box.appendChild(b);
+}
+function clearBanner(key) {
+  const n = $("#banners").querySelector('[data-k="' + key + '"]');
+  if (n) n.remove();
+}
+
+function logLine(e) {
+  if (e.seq && e.seq <= lastSeq) return;
+  if (e.seq) lastSeq = e.seq;
+  const log = $("#log");
+  const near = log.scrollTop + log.clientHeight > log.scrollHeight - 40;
+  const d = el("div", "le");
+  d.appendChild(el("span", "ts", hhmmss(e.ts)));
+  d.appendChild(el("span", "lv lv-" + e.level, e.level));
+  d.appendChild(el("span", "m", e.msg));
+  log.appendChild(d);
+  while (log.childElementCount > 400) log.removeChild(log.firstChild);
+  if (near) log.scrollTop = log.scrollHeight;
+  $("#conlast").textContent = e.msg.length > 70 ? e.msg.slice(0, 70) + "…" : e.msg;
+  if (e.level === "error") banner("err", e.msg, "e" + e.seq);
+}
+const uiLog = (msg) => logLine({ ts: Date.now(), level: "ui", msg });
+
+// ------------------------------------------------------------------- api ---
+
+async function api(method, url, body) {
+  try {
+    const r = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const m = (j && (j.error || j.message)) || (method + " " + url + " -> " + r.status);
+      uiLog("request failed: " + m);
+      banner("err", m);
+      return { __error: m };
+    }
+    return j;
+  } catch (e) {
+    uiLog("request failed: " + e.message);
+    banner("err", "cannot reach the board: " + e.message);
+    return { __error: e.message };
+  }
+}
+
+// ---------------------------------------------------------------- render ---
+
+function render() {
+  if (!S) return;
+  renderProjects();
+  renderTop();
+  renderBoard();
+  renderGraph();
+  renderPlanner();
+  if (openId) renderDrawer();
+}
+
+function renderProjects() {
+  const box = $("#projects");
+  box.innerHTML = "";
+  if (!S.projects.length) {
+    box.appendChild(el("div", "empty",
+      "No projects yet.\nClick + New project and pick the folder you want to work in."));
+    return;
+  }
+  for (const p of S.projects) {
+    const d = el("div", "proj" + (p.active ? " active" : ""));
+    d.appendChild(el("div", "n", p.name));
+    d.appendChild(el("div", "p", p.path || ""));
+    const c = el("div", "c");
+    const entries = Object.entries(p.counts);
+    if (!entries.length) c.appendChild(el("span", "pill", "no tasks"));
+    for (const [k, v] of entries) c.appendChild(el("span", "pill", k + " " + v));
+    d.appendChild(c);
+    d.onclick = () => {
+      uiLog("switching to project " + p.name);
+      api("POST", "/api/projects/" + encodeURIComponent(p.slug) + "/activate");
+    };
+    box.appendChild(d);
+  }
+}
+
+function renderTop() {
+  const a = S.active;
+  $("#projname").textContent = a ? a.meta.name : "no project";
+  $("#objective").textContent = a && a.meta.objective ? a.meta.objective.split("\n")[0] : "";
+  $("#objective").title = a ? (a.meta.objective || "") : "";
+
+  const sched = S.sched || {};
+  const busy = /loading|dispatching|running/.test(sched.note || "");
+  const n = $("#note");
+  n.textContent = sched.note || "";
+  n.className = busy ? "busy" : "";
+  $("#pause").textContent = sched.paused ? "Resume" : "Pause";
+  $("#interrupt").disabled = !(sched.running && sched.running.length);
+  $("#newtask").disabled = !a;
+  $("#railsub").textContent = S.projectsRoot ? "projects in " + S.projectsRoot.replace(/^.*[\\/]([^\\/]+[\\/][^\\/]+)$/, "…/$1") : "pi multi-model board";
+
+  const chips = $("#chips");
+  chips.innerHTML = "";
+  if (S.models && S.models.__down) {
+    banner("err", "The llama.cpp router is not running on " + (S.router || ":8080") +
+      " — start start_router.bat (or ROUTER_TRAY.vbs). Tasks stay in Ready until it is up.", "router");
+    const c = el("span", "chip");
+    c.appendChild(el("span", "dot"));
+    c.appendChild(el("span", null, "router down"));
+    chips.appendChild(c);
+  } else {
+    clearBanner("router");
+    for (const id of Object.keys(S.routing.models)) {
+      const st = (S.models || {})[id] || "unloaded";
+      const loading = (sched.slot && sched.slot.loading === id) || st === "loading";
+      const c = el("span", "chip" + (st === "loaded" ? " on" : "") + (loading ? " loading" : ""));
+      c.appendChild(el("span", "dot"));
+      c.appendChild(el("span", null, id));
+      c.title = (S.routing.models[id].desc || id) + "\nclick to " + (st === "loaded" ? "unload" : "load");
+      c.onclick = () => {
+        const act = st === "loaded" ? "unload" : "load";
+        uiLog(act + "ing " + id + " (a swap takes ~30s for the big models)");
+        api("POST", "/api/models/" + act, { model: id });
+      };
+      chips.appendChild(c);
+    }
+  }
+  if (S.piFound === false) {
+    banner("err", "pi's cli.js was not found — tasks cannot run. Set PI_CLI to pi-coding-agent's dist/cli.js.", "pi");
+  }
+}
+
+function renderBoard() {
+  const board = $("#board");
+  board.innerHTML = "";
+  if (!S.active) {
+    board.appendChild(el("div", "empty",
+      "No project selected. Create one from the left, then add tasks."));
+    return;
+  }
+  const tasks = S.active.tasks;
+
+  if (S.active.cycles && S.active.cycles.length) {
+    banner("warn", "Dependency cycle: " + S.active.cycles.join("  |  ") +
+      " — those tasks can never become ready.", "cyc");
+  } else clearBanner("cyc");
+
+  const bad = tasks.filter((t) => t.errors && t.errors.length);
+  if (bad.length) {
+    banner("warn", bad.length + " task file(s) have problems: " +
+      bad.map((t) => t.id + " (" + t.errors.join("; ") + ")").join(", "), "badfiles");
+  } else clearBanner("badfiles");
+
+  for (const [name, statuses, hint] of COLS) {
+    const items = tasks.filter((t) => statuses.includes(t.status))
+      .sort((a, b) => (a.priority - b.priority) || String(a.id).localeCompare(String(b.id)));
+    const col = el("div", "col" + (items.some((t) => t.status === "running") ? " hot" : ""));
+    const h = el("h3");
+    h.appendChild(el("span", null, name));
+    h.appendChild(el("span", "n", String(items.length)));
+    h.title = hint;
+    col.appendChild(h);
+    const body = el("div", "body");
+    if (!items.length) body.appendChild(el("div", "empty", hint));
+    for (const t of items) body.appendChild(cardFor(t));
+    col.appendChild(body);
+    board.appendChild(col);
+  }
+}
+
+function cardFor(t) {
+  const c = el("div", "card s-" + t.status + (t.id === openId ? " sel" : ""));
+  const title = el("div", "t");
+  title.appendChild(el("span", "id", t.id));
+  title.appendChild(document.createTextNode(t.title || "(untitled)"));
+  c.appendChild(title);
+
+  const m = el("div", "m");
+  if (t.complexity != null) m.appendChild(el("span", "pill", "cx " + t.complexity));
+  if (t.assignee) m.appendChild(el("span", "pill", t.assignee));
+  // Who is checking the work, and that it is deliberately not the author.
+  if (t.status === "testing" && t.reviewer) {
+    m.appendChild(el("span", "pill vpill", "verifying: " + t.reviewer));
+  } else if (t.status === "review") {
+    m.appendChild(el("span", "pill vpill", "waiting to be verified"));
+  }
+  if (t.reviewFails) m.appendChild(el("span", "pill bad", "failed check x" + t.reviewFails));
+  if (t.taskType) m.appendChild(el("span", "pill", t.taskType));
+  if (t.dependsOn && t.dependsOn.length) m.appendChild(el("span", "pill", "← " + t.dependsOn.join(",")));
+  if (t.files && t.files.length) m.appendChild(el("span", "pill", t.files.length + " file" + (t.files.length > 1 ? "s" : "")));
+  if (["failed", "cancelled", "needs-decomposition"].includes(t.status)) {
+    m.appendChild(el("span", "pill", t.status));
+  }
+  if (t.attempts > 1) m.appendChild(el("span", "pill", "run " + t.attempts));
+  c.appendChild(m);
+
+  if (t.blockedReason) c.appendChild(el("div", "why", t.blockedReason));
+  if (t.errors && t.errors.length) c.appendChild(el("div", "err", "⚠ " + t.errors.join("; ")));
+
+  if (t.status === "running") {
+    const k = S.active.slug + ":" + t.id;
+    const txt = liveText[k] || "";
+    c.appendChild(el("div", "stream", txt ? txt.slice(-320) : "waiting for the first token…"));
+    c.appendChild(el("div", "bar"));
+  }
+  c.onclick = () => { openId = t.id; render(); };
+  return c;
+}
+
+// --------------------------------------------------------------- drawer ---
+
+const currentTask = () =>
+  (S && S.active ? S.active.tasks.find((t) => t.id === openId) : null);
+
+function field(label, node, hint) {
+  const f = el("div", "field");
+  f.appendChild(el("label", null, label));
+  f.appendChild(node);
+  if (hint) f.appendChild(el("div", "hint", hint));
+  return f;
+}
+
+function renderDrawer() {
+  const t = currentTask();
+  const d = $("#drawer");
+  if (!t) { d.classList.remove("open"); openId = null; return; }
+  d.classList.add("open");
+  $("#dtitle").textContent = t.id + "  ·  " + (t.title || "(untitled)") + "  ·  " + t.status;
+
+  const b = $("#dbody");
+  const focus = document.activeElement && document.activeElement.dataset
+    ? document.activeElement.dataset.k : null;
+  const scroll = b.scrollTop;
+  b.innerHTML = "";
+
+  const ti = el("input"); ti.value = t.title || ""; ti.dataset.k = "title";
+  b.appendChild(field("Title", ti));
+
+  const row = el("div", "row");
+  const cx = el("input"); cx.type = "number"; cx.min = 1; cx.max = 10;
+  cx.value = t.complexity == null ? "" : t.complexity; cx.dataset.k = "complexity";
+  row.appendChild(field("Complexity", cx, "8+ is held for decomposition"));
+  const as = el("select"); as.dataset.k = "assignee";
+  as.appendChild(new Option("(auto by complexity)", ""));
+  for (const mId of Object.keys(S.routing.models)) as.appendChild(new Option(mId, mId));
+  as.value = t.assignee || "";
+  row.appendChild(field("Model", as));
+  const pr = el("input"); pr.type = "number"; pr.value = t.priority; pr.dataset.k = "priority";
+  row.appendChild(field("Priority", pr, "lower runs sooner"));
+  b.appendChild(row);
+
+  const row2 = el("div", "row");
+  const ty = el("input"); ty.value = t.taskType || ""; ty.dataset.k = "taskType";
+  row2.appendChild(field("Task type", ty, "code / research / …"));
+  const dep = el("input"); dep.value = (t.dependsOn || []).join(", "); dep.dataset.k = "dependsOn";
+  row2.appendChild(field("Depends on", dep, "comma-separated ids"));
+  const par = el("input"); par.value = t.parent || ""; par.dataset.k = "parent";
+  row2.appendChild(field("Parent", par, "for subtasks"));
+  b.appendChild(row2);
+
+  const fi = el("textarea"); fi.rows = 3; fi.value = (t.files || []).join("\n"); fi.dataset.k = "files";
+  b.appendChild(field("Files", fi, "one per line — tasks sharing a file never run in parallel"));
+
+  for (const s of ["Description", "Context", "Acceptance", "Result"]) {
+    const ta = el("textarea"); ta.rows = s === "Result" ? 7 : 5;
+    ta.value = (t.sections || {})[s] || ""; ta.dataset.k = "sec:" + s;
+    const hints = {
+      Description: "written for a worker with no prior context",
+      Context: "everything needed to do this without asking",
+      Acceptance: "how we know it is done",
+      Result: "filled in when a worker finishes",
+    };
+    b.appendChild(field(s, ta, hints[s]));
+  }
+
+  const lk = S.active.slug + ":" + t.id;
+
+  // What the agent actually did, as it does it - turns, tool calls, results.
+  const tbox = el("div", "trace");
+  b.appendChild(field("pi trace", tbox,
+    "every turn and tool call this task made, live"));
+  renderTrace(tbox, traces[lk]);
+  if (!traces[lk]) loadTrace(S.active.slug, t.id);
+
+  if (liveText[lk]) {
+    const pre = el("pre", "live", liveText[lk]);
+    b.appendChild(field("Live output", pre));
+    requestAnimationFrame(() => { pre.scrollTop = pre.scrollHeight; });
+  }
+  if (t.filePath) {
+    const fp = el("div", "hint", t.filePath);
+    fp.style.wordBreak = "break-all";
+    b.appendChild(fp);
+  }
+
+  b.scrollTop = scroll;
+  if (focus) { const n = b.querySelector('[data-k="' + focus + '"]'); if (n) n.focus(); }
+
+  const f = $("#dfoot");
+  f.innerHTML = "";
+  const base = "/api/projects/" + encodeURIComponent(S.active.slug) + "/tasks/" + encodeURIComponent(t.id);
+  const btn = (label, fn, cls) => {
+    const x = el("button", cls || null, label);
+    x.onclick = async () => { x.disabled = true; await fn(); x.disabled = false; };
+    f.appendChild(x);
+  };
+  btn("Save", () => saveTask(base), "primary");
+  if (t.status === "draft") btn("Approve", () => { uiLog(t.id + " approved"); return api("POST", base + "/approve"); });
+  if (t.status === "running") btn("Cancel run", () => { uiLog("cancelling " + t.id); return api("POST", base + "/cancel"); }, "danger");
+  else btn("Hold", () => api("POST", base + "/hold"));
+  if (["done", "failed", "cancelled", "review", "testing"].includes(t.status)) {
+    btn("Re-run", () => api("POST", base + "/rerun"));
+  }
+  if (["review", "testing"].includes(t.status)) {
+    btn("Mark done", () => api("PATCH", base, { status: "done" }));
+  }
+  btn("Delete", () => {
+    if (!confirm("Delete " + t.id + "? The .md file is removed from disk.")) return Promise.resolve();
+    openId = null;
+    return api("DELETE", base);
+  }, "danger");
+}
+
+async function saveTask(base) {
+  const g = (k) => { const n = $("#dbody").querySelector('[data-k="' + k + '"]'); return n ? n.value : ""; };
+  const body = {
+    title: g("title"),
+    complexity: g("complexity") === "" ? null : Number(g("complexity")),
+    assignee: g("assignee") || null,
+    priority: Number(g("priority")) || 100,
+    taskType: g("taskType") || null,
+    parent: g("parent") || null,
+    dependsOn: g("dependsOn").split(",").map((s) => s.trim()).filter(Boolean),
+    files: g("files").split("\n").map((s) => s.trim()).filter(Boolean),
+    sections: {},
+  };
+  for (const s of ["Description", "Context", "Acceptance", "Result"]) body.sections[s] = g("sec:" + s);
+  uiLog("saving " + openId);
+  await api("PATCH", base, body);
+}
+
+$("#dclose").onclick = () => { openId = null; $("#drawer").classList.remove("open"); render(); };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if ($("#modal").classList.contains("open")) $("#modal").classList.remove("open");
+    else if (openId) { openId = null; render(); }
+  }
+});
+
+// ---------------------------------------------------------------- modal ---
+
+function closeModal() { $("#modal").classList.remove("open"); }
+
+function newProjectModal() {
+  const box = $("#modalbox");
+  box.innerHTML = "";
+  box.appendChild(el("h2", null, "New project"));
+
+  const pathIn = el("input");
+  pathIn.placeholder = "C:\\path\\to\\your\\project";
+  box.appendChild(field("Project folder", pathIn,
+    "The working directory workers run in. Pick it below or type it."));
+
+  const picker = el("div", "picker");
+  box.appendChild(picker);
+
+  const nameIn = el("input");
+  box.appendChild(field("Name", nameIn, "defaults to the folder name"));
+  const objIn = el("textarea"); objIn.rows = 3;
+  box.appendChild(field("Objective", objIn,
+    "Stored in project.md and prepended to every worker prompt."));
+
+  const errBox = el("div", "err");
+  box.appendChild(errBox);
+
+  async function browse(p) {
+    picker.innerHTML = "";
+    picker.appendChild(el("div", "it", "loading…"));
+    const r = await fetch("/api/browse" + (p ? "?path=" + encodeURIComponent(p) : ""))
+      .then((x) => x.json()).catch((e) => ({ error: e.message }));
+    picker.innerHTML = "";
+    if (r.error) { picker.appendChild(el("div", "it", "cannot read: " + r.error)); return; }
+    if (r.path) pathIn.value = r.path;
+    if (r.parent !== null && r.parent !== undefined) {
+      const up = el("div", "it up", r.parent ? ".. " + r.parent : ".. (drives)");
+      up.onclick = () => browse(r.parent);
+      picker.appendChild(up);
+    }
+    for (const d of r.dirs) {
+      const it = el("div", "it", d.name);
+      it.onclick = () => browse(d.path);
+      picker.appendChild(it);
+    }
+    if (!r.dirs.length) picker.appendChild(el("div", "it", "(no subfolders)"));
+  }
+  browse("");
+
+  const bar = el("div", "bar");
+  bar.appendChild(el("span", "grow"));
+  const cancel = el("button", null, "Cancel"); cancel.onclick = closeModal;
+  const ok = el("button", "primary", "Create");
+  ok.onclick = async () => {
+    const p = pathIn.value.trim();
+    if (!p) { errBox.textContent = "Pick a folder first."; return; }
+    ok.disabled = true;
+    errBox.textContent = "";
+    const r = await api("POST", "/api/projects", {
+      path: p, name: nameIn.value.trim(), objective: objIn.value.trim(),
+    });
+    ok.disabled = false;
+    if (r.__error) { errBox.textContent = r.__error; return; }
+    closeModal();
+  };
+  bar.append(cancel, ok);
+  box.appendChild(bar);
+  $("#modal").classList.add("open");
+  pathIn.focus();
+}
+
+function newTaskModal() {
+  const box = $("#modalbox");
+  box.innerHTML = "";
+  box.appendChild(el("h2", null, "New task in " + S.active.meta.name));
+
+  const title = el("input");
+  box.appendChild(field("Title", title));
+  const r1 = el("div", "row2");
+  const cx = el("input"); cx.type = "number"; cx.min = 1; cx.max = 10; cx.value = 3;
+  r1.appendChild(field("Complexity", cx, "1 trivial … 10 must be split"));
+  const ty = el("input"); ty.value = "code";
+  r1.appendChild(field("Task type", ty, "code / research / …"));
+  box.appendChild(r1);
+  const desc = el("textarea"); desc.rows = 5;
+  box.appendChild(field("Description", desc, "written for a worker with no prior context"));
+  const ctx = el("textarea"); ctx.rows = 4;
+  box.appendChild(field("Context", ctx, "everything it needs to know"));
+  const files = el("textarea"); files.rows = 2;
+  box.appendChild(field("Files", files, "one per line"));
+  const ready = el("input"); ready.type = "checkbox"; ready.checked = true;
+  ready.style.width = "auto";
+  const rl = el("label"); rl.style.cssText = "display:flex;gap:7px;align-items:center;color:var(--dim)";
+  rl.append(ready, document.createTextNode("run as soon as the model is free"));
+  box.appendChild(rl);
+
+  const bar = el("div", "bar");
+  bar.appendChild(el("span", "grow"));
+  const cancel = el("button", null, "Cancel"); cancel.onclick = closeModal;
+  const ok = el("button", "primary", "Create");
+  ok.onclick = async () => {
+    if (!title.value.trim()) return;
+    ok.disabled = true;
+    const r = await api("POST", "/api/projects/" + encodeURIComponent(S.active.slug) + "/tasks", {
+      title: title.value.trim(),
+      complexity: cx.value ? Number(cx.value) : null,
+      taskType: ty.value.trim() || null,
+      status: ready.checked ? "ready" : "draft",
+      files: files.value.split("\n").map((s) => s.trim()).filter(Boolean),
+      sections: { Description: desc.value, Context: ctx.value },
+    });
+    ok.disabled = false;
+    if (!r.__error) closeModal();
+  };
+  bar.append(cancel, ok);
+  box.appendChild(bar);
+  $("#modal").classList.add("open");
+  title.focus();
+}
+
+$("#viewtoggle").onclick = () => {
+  document.body.classList.toggle("graphview");
+  $("#viewtoggle").textContent = document.body.classList.contains("graphview") ? "Board" : "Graph";
+  renderGraph();
+};
+$("#newproj").onclick = newProjectModal;
+$("#newtask").onclick = () => { if (S && S.active) newTaskModal(); };
+$("#pause").onclick = () => {
+  const to = S.sched.paused ? "resume" : "pause";
+  uiLog("scheduler " + to);
+  api("POST", "/api/scheduler/" + to);
+};
+$("#interrupt").onclick = () => {
+  if (!confirm("Kill every running worker? Partial output is kept and the cards are parked in Draft so they do not restart on their own."))
+    return;
+  api("POST", "/api/scheduler/interrupt");
+};
+$("#conhd").onclick = () => {
+  const c = $("#console");
+  c.classList.toggle("collapsed");
+  $("#contoggle").textContent = c.classList.contains("collapsed") ? "▸" : "▾";
+};
+
+// --------------------------------------------------------------- graph ---
+
+// Layered DAG. Depth = longest path from a root, so a task sits one lane to the
+// right of everything it waits on; tasks in the same lane can run together if
+// their models and files allow. Recomputed from the snapshot on every state
+// event, so hand edits and planner edits both move it live.
+const MODEL_COLOR = { kat: "#6ea8fe", bigbang: "#4fb6c8", bonsai: "#4ec98a" };
+const STATUS_FILL = {
+  running: "#2a2140", done: "#152a1f", failed: "#2b1416",
+  review: "#12222a", testing: "#12222a", ready: "#171d2b",
+  blocked: "#241f14", "needs-decomposition": "#2a1f12", draft: "#14171f",
+  cancelled: "#14171f",
+};
+
+function modelOf(t) {
+  if (t.assignee) return t.assignee;
+  const a = (S.routing.assignment) || {};
+  const cx = t.complexity == null ? 5 : t.complexity;
+  const isCode = (a.codeTypes || []).includes(t.taskType);
+  for (const b of (a.bands || [])) {
+    if (cx <= b.upTo) return (isCode && b.code) ? b.code : (b.model || b.default);
+  }
+  return S.routing.mainModel;
+}
+
+function depths(tasks) {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const memo = new Map();
+  const seen = new Set();
+  const walk = (id) => {
+    if (memo.has(id)) return memo.get(id);
+    if (seen.has(id)) return 0;              // cycle: stop, do not hang
+    seen.add(id);
+    const t = byId.get(id);
+    let d = 0;
+    for (const p of (t ? t.dependsOn : [])) {
+      if (byId.has(p)) d = Math.max(d, walk(p) + 1);
+    }
+    seen.delete(id);
+    memo.set(id, d);
+    return d;
+  };
+  for (const t of tasks) walk(t.id);
+  return memo;
+}
+
+function parallelWidth(model) {
+  return ((S.routing.models || {})[model] || {}).parallel || 1;
+}
+
+const normFile = (f) => String(f).replace(/\\/g, "/").toLowerCase();
+
+// Same rule the scheduler uses: two tasks may run at the same time only if
+// their declared files are disjoint. Drawn rather than described, because
+// "why are these three boxed together and that one is not" is the question.
+function fileClash(t, batch) {
+  const mine = new Set((t.files || []).map(normFile));
+  if (!mine.size) return false;
+  return batch.some((o) => (o.files || []).some((f) => mine.has(normFile(f))));
+}
+
+function packBatches(list, width) {
+  const out = [];
+  for (const t of list) {
+    let placed = false;
+    for (const b of out) {
+      if (b.length >= width || fileClash(t, b)) continue;
+      b.push(t); placed = true; break;
+    }
+    if (!placed) out.push([t]);
+  }
+  return out;
+}
+
+function renderGraph() {
+  const g = document.getElementById("graph");
+  if (!document.body.classList.contains("graphview")) return;
+  g.innerHTML = "";
+  if (!S || !S.active || !S.active.tasks.length) {
+    g.appendChild(el("div", "empty", "No tasks to graph yet."));
+    return;
+  }
+  const tasks = S.active.tasks;
+  const d = depths(tasks);
+  const lanes = new Map();
+  for (const t of tasks) {
+    const k = d.get(t.id) || 0;
+    if (!lanes.has(k)) lanes.set(k, []);
+    lanes.get(k).push(t);
+  }
+
+  const NW = 208, NH = 58, NGAP = 8, BPAD = 8, BLAB = 15;
+  const GPAD = 9, GHEAD = 20, GGAP = 16, LGAP = 92, PAD = 22, TOP = 34;
+  const COLW = NW + BPAD * 2 + GPAD * 2;
+
+  const pos = new Map();
+  const boxes = [];
+  const laneLabels = [];
+  let x = PAD, maxY = TOP;
+
+  for (const [lane, items] of [...lanes.entries()].sort((a, b) => a[0] - b[0])) {
+    laneLabels.push({ x, lane });
+    // Group by the model that will actually run it, then split each group into
+    // batches that could start at the same time on that model.
+    const byModel = new Map();
+    items.sort((p, q) => (p.priority - q.priority) || String(p.id).localeCompare(String(q.id)));
+    for (const t of items) {
+      const m = modelOf(t);
+      if (!byModel.has(m)) byModel.set(m, []);
+      byModel.get(m).push(t);
+    }
+
+    let y = TOP;
+    for (const [model, list] of byModel) {
+      const width = parallelWidth(model);
+      const batches = packBatches(list, width);
+      const gy = y;
+      let by = gy + GHEAD;
+      for (const b of batches) {
+        const wide = b.length > 1;
+        const bh = BPAD * 2 + (wide ? BLAB : 0) + b.length * NH + (b.length - 1) * NGAP;
+        boxes.push({
+          kind: "batch", x: x + GPAD, y: by, w: NW + BPAD * 2, h: bh, model,
+          label: wide ? "runs together · " + b.length + " of " + width + " slots" : null,
+        });
+        let ny = by + BPAD + (wide ? BLAB : 0);
+        for (const t of b) { pos.set(t.id, { x: x + GPAD + BPAD, y: ny }); ny += NH + NGAP; }
+        by += bh + 10;
+      }
+      const gh = by - gy - 10 + GPAD;
+      boxes.push({
+        kind: "group", x, y: gy, w: COLW, h: gh, model,
+        label: model + (width > 1 ? " · " + width + "-wide" : " · one at a time")
+          + (batches.length > 1 ? " · " + batches.length + " passes" : ""),
+      });
+      y = gy + gh + GGAP;
+    }
+    maxY = Math.max(maxY, y);
+    x += COLW + LGAP;
+  }
+
+  const W = x - LGAP + PAD, H = maxY + PAD;
+  const NS = "http://www.w3.org/2000/svg";
+  const mk = (tag, attrs, cls) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (cls) n.setAttribute("class", cls);
+    return n;
+  };
+
+  const svg = mk("svg", { width: W, height: H });
+  const defs = document.createElementNS(NS, "defs");
+  defs.innerHTML =
+    '<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">' +
+    '<path d="M0,0 L10,5 L0,10 z" fill="#2a3042"/></marker>' +
+    '<marker id="ahh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">' +
+    '<path d="M0,0 L10,5 L0,10 z" fill="#b98ce0"/></marker>';
+  svg.appendChild(defs);
+
+  for (const ll of laneLabels) {
+    const label = mk("text", { x: ll.x, y: 18 }, "glane");
+    label.textContent = ll.lane === 0 ? "start" : "after " + ll.lane;
+    svg.appendChild(label);
+  }
+
+  // Boxes under everything: the model group first, then the parallel batches.
+  for (const b of boxes) {
+    if (b.kind !== "group") continue;
+    const c = MODEL_COLOR[b.model] || "#2a3042";
+    svg.appendChild(mk("rect", {
+      x: b.x, y: b.y, width: b.w, height: b.h, rx: 10,
+      fill: c + "0e", stroke: c + "55",
+    }));
+    const t = mk("text", { x: b.x + 11, y: b.y + 14, fill: c }, "gmodel");
+    t.textContent = b.label;
+    svg.appendChild(t);
+  }
+  for (const b of boxes) {
+    if (b.kind !== "batch" || !b.label) continue;
+    const c = MODEL_COLOR[b.model] || "#2a3042";
+    svg.appendChild(mk("rect", {
+      x: b.x, y: b.y, width: b.w, height: b.h, rx: 8,
+      fill: "none", stroke: c + "88", "stroke-dasharray": "5 4",
+    }));
+    const t = mk("text", { x: b.x + 9, y: b.y + 12, fill: c }, "gbatch");
+    t.textContent = b.label;
+    svg.appendChild(t);
+  }
+
+  for (const t of tasks) {
+    const to = pos.get(t.id);
+    for (const dep of (t.dependsOn || [])) {
+      const from = pos.get(dep);
+      if (!from || !to) continue;
+      const x1 = from.x + NW, y1 = from.y + NH / 2;
+      const x2 = to.x, y2 = to.y + NH / 2;
+      const mid = (x1 + x2) / 2;
+      const depTask = tasks.find((z) => z.id === dep);
+      const hot = depTask && (depTask.status === "running" || depTask.status === "testing");
+      svg.appendChild(mk("path", {
+        d: "M" + x1 + "," + y1 + " C" + mid + "," + y1 + " " + mid + "," + y2 + " " + x2 + "," + y2,
+        "marker-end": hot ? "url(#ahh)" : "url(#ah)",
+      }, "gedge" + (hot ? " hot" : "")));
+    }
+  }
+
+  for (const t of tasks) {
+    const p = pos.get(t.id);
+    if (!p) continue;
+    const model = modelOf(t);
+    const gn = mk("g", {}, "gnode");
+    gn.style.cursor = "pointer";
+    gn.onclick = () => { openId = t.id; renderDrawer(); };
+
+    gn.appendChild(mk("rect", {
+      x: p.x, y: p.y, width: NW, height: NH, rx: 8,
+      fill: STATUS_FILL[t.status] || "#171d2b", stroke: MODEL_COLOR[model] || "#2a3042",
+    }));
+    gn.appendChild(mk("rect", {
+      x: p.x, y: p.y, width: 4, height: NH, fill: MODEL_COLOR[model] || "#2a3042",
+    }));
+
+    const t1 = mk("text", { x: p.x + 13, y: p.y + 19 });
+    t1.textContent = t.id + "  " + (t.title || "").slice(0, 22);
+    gn.appendChild(t1);
+
+    const t2 = mk("text", { x: p.x + 13, y: p.y + 34 }, "sub");
+    t2.textContent = "cx " + (t.complexity == null ? "-" : t.complexity) + " · " + t.status
+      + (t.status === "testing" && t.reviewer ? " by " + t.reviewer : "");
+    gn.appendChild(t2);
+
+    const t3 = mk("text", { x: p.x + 13, y: p.y + 48 }, "sub");
+    t3.textContent = (t.files || []).join(", ").slice(0, 34) || "no files declared";
+    gn.appendChild(t3);
+
+    svg.appendChild(gn);
+  }
+  g.appendChild(svg);
+
+  const legend = el("div", null);
+  legend.style.cssText = "display:flex;gap:14px;margin-top:14px;color:var(--dim);"
+    + "font-size:11px;flex-wrap:wrap";
+  for (const [mId, c] of Object.entries(MODEL_COLOR)) {
+    const i = el("span", null);
+    i.style.cssText = "display:inline-flex;gap:6px;align-items:center";
+    const sw = el("span", null);
+    sw.style.cssText = "width:10px;height:10px;border-radius:3px;background:" + c;
+    i.append(sw, document.createTextNode(mId));
+    legend.appendChild(i);
+  }
+  legend.appendChild(el("span", null,
+    "columns = dependency depth · outer box = the model that will run them · "
+    + "dashed box = starts together (file-disjoint, up to that model's width)"));
+  g.appendChild(legend);
+}
+
+// --------------------------------------------------------------- trace ---
+
+const traces = {};   // "slug:id" -> [entry]
+
+function traceRow(e) {
+  const d = el("div", "tr " + e.kind + (e.open ? " open" : ""));
+  if (e.seq != null) d.dataset.seq = e.seq;
+  const label = { turn: "turn", tool: "tool", tool_result: "result",
+    thinking: "reasoning", thinking_done: "thought", note: "note" }[e.kind] || e.kind;
+  d.appendChild(el("span", "k", label));
+  const v = e.kind === "tool" ? (e.name + "  " + (e.args || ""))
+    : e.kind === "tool_result" ? (e.name + "\n" + (e.text || ""))
+    : e.kind === "turn" ? "— new turn —"
+    : e.kind === "thinking_done" ? "(finished thinking)"
+    : (e.text || "");
+  d.appendChild(el("span", "v", v));
+  return d;
+}
+
+// Reasoning grows in place rather than adding a row per delta, so the pane
+// reads like the model is thinking out loud. Returns false if the row is not
+// on screen (a different card is open), in which case only the cache matters.
+function growRow(box, seq, delta, close) {
+  if (!box) return false;
+  const row = box.querySelector('.tr[data-seq="' + seq + '"]');
+  if (!row) return false;
+  if (close) { row.classList.remove("open"); return true; }
+  const near = box.scrollTop + box.clientHeight > box.scrollHeight - 40;
+  const v = row.querySelector(".v");
+  v.textContent += delta;
+  // Keep the signature in step with the DOM, or the next periodic render
+  // rebuilds the box and throws away the scroll position.
+  if (row === box.lastElementChild) {
+    box.dataset.sig = box.children.length + ":" + seq + ":" + v.textContent.length;
+  }
+  if (near) box.scrollTop = box.scrollHeight;
+  return true;
+}
+
+// Same growth applied to the cached trace, so reopening a card shows the whole
+// thought and not just the rows that arrived while it was open.
+function growCached(list, seq, delta, close) {
+  if (!list) return;
+  const e = list.find((x) => x.seq === seq);
+  if (!e) return;
+  if (close) e.open = false; else e.text = (e.text || "") + delta;
+}
+
+// A full rebuild every second would fight the growing reasoning row - it resets
+// scroll and flickers - so skip it when nothing has actually changed.
+function traceSig(list) {
+  const last = list && list.length ? list[list.length - 1] : null;
+  return (list ? list.length : 0) + ":" +
+    (last ? last.seq + ":" + ((last.text || "").length) : "0");
+}
+
+function renderTrace(box, list) {
+  const sig = traceSig(list);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = "";
+  if (!list || !list.length) {
+    box.appendChild(el("div", "tr", "nothing yet"));
+    return;
+  }
+  for (const e of list) box.appendChild(traceRow(e));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function loadTrace(slug, id) {
+  const k = slug + ":" + id;
+  const r = await fetch(`/api/projects/${encodeURIComponent(slug)}/tasks/${encodeURIComponent(id)}/trace`)
+    .then((x) => x.json()).catch(() => null);
+  if (r) traces[k] = r.trace || [];
+  const box = document.querySelector("#dbody .trace");
+  if (box && openId === id) renderTrace(box, traces[k]);
+}
+
+// -------------------------------------------------------------- planner ---
+
+let planText = "";
+let plannerTrace = [];
+
+function renderPlanner() {
+  const pl = (S && S.planner) || { running: false };
+  const out = $("#pout");
+  const running = pl.running;
+  const verb = pl.kind === "reviewer" ? "reviewing… " : "planning… ";
+  $("#pstate").textContent = (S && S.routing ? S.routing.mainModel : "bigbang")
+    + (running ? " · " + verb + Math.round((Date.now() - pl.started) / 1000) + "s" : " · idle");
+  $("#pcancel").style.display = running ? "" : "none";
+  // Both stay enabled while it runs - queueing the next instruction while you
+  // watch this one is the whole point of steering.
+  $("#psend").disabled = !(S && S.active);
+  $("#pnow").disabled = !(S && S.active);
+  $("#pmsg").disabled = false;
+
+  const st = S && S.steer;
+  const strip = $("#psteer");
+  if (st) {
+    strip.style.display = "";
+    strip.className = "banner " + (st.mode === "now" ? "warn" : "info");
+    strip.textContent = (st.mode === "now" ? "interrupting, then: " : "queued for the next drain: ")
+      + st.message.split(/\r?\n/)[0].slice(0, 90);
+    const x = el("span", "x", "×");
+    x.title = "drop it";
+    x.onclick = () => api("DELETE", "/api/planner/steer");
+    strip.appendChild(x);
+  } else strip.style.display = "none";
+  if (running && pl.text && !planText) planText = pl.text;
+  const tb = $("#ptrace");
+  renderTrace(tb, (pl.trace && pl.trace.length) ? pl.trace : plannerTrace);
+  tb.style.display = ((pl.trace && pl.trace.length) || plannerTrace.length) ? "" : "none";
+  if (planText) { out.classList.remove("idle"); out.textContent = planText; }
+  else {
+    out.classList.add("idle");
+    out.textContent = S && S.active
+      ? "The planner reads the board, then creates and edits task cards with its kanban tools.\n"
+        + "It never does the work itself — that is what the workers are for."
+      : "Create a project first.";
+  }
+}
+
+// Two ways in, and the difference is what it costs you. Steer waits for the
+// running batch to drain - no swap, nothing killed. Interrupt kills the workers
+// and the current planner turn and answers now, paying the swap.
+async function sendPlan(mode) {
+  if (!S || !S.active) return;
+  const msg = $("#pmsg").value.trim()
+    || "Plan the work needed to reach the objective.";
+  if (mode === "now" && (S.sched.running || []).length
+      && !confirm("Interrupt kills "
+        + (S.sched.running || []).map((r) => r.id).join(", ")
+        + " and answers now. Partial output is kept. Continue?")) return;
+  planText = "";
+  plannerTrace = [];
+  $("#pout").classList.remove("idle");
+  $("#pout").textContent = mode === "now"
+    ? "stopping everything, then starting the planner… (a model swap can take ~30s)"
+    : "starting the planner… (a model swap can take ~30s)";
+  const r = await api("POST", "/api/projects/" + encodeURIComponent(S.active.slug) + "/plan",
+    { message: msg, mode: mode || "steer" });
+  if (r.__error) { $("#pout").textContent = r.__error; return; }
+  if (r.queued && r.mode === "steer") {
+    $("#pout").textContent = "queued — it runs when the current work drains.";
+  }
+  $("#pmsg").value = "";
+}
+
+$("#psend").onclick = () => sendPlan("steer");
+$("#pnow").onclick = () => sendPlan("now");
+$("#pcancel").onclick = () => api("POST", "/api/planner/cancel");
+$("#pmsg").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendPlan("steer"); }
+});
+setInterval(() => { if (S && S.planner && S.planner.running) renderPlanner(); }, 1000);
+
+// ------------------------------------------------------------------ sse ---
+
+let es = null;
+let attempts = 0;
+
+function setConn(state, text) {
+  const c = $("#conn");
+  c.className = "status " + state;
+  c.querySelector(".txt").textContent = text;
+}
+
+function connect() {
+  if (es) { try { es.close(); } catch (e) { /* already closed */ } }
+  setConn("", attempts ? "reconnecting (" + attempts + ")" : "connecting");
+  es = new EventSource("/api/events");
+
+  es.onopen = () => {
+    if (attempts) uiLog("reconnected to the board");
+    attempts = 0;
+    setConn("live", "live");
+    clearBanner("conn");
+  };
+  es.addEventListener("state", (e) => { S = JSON.parse(e.data); render(); });
+  es.addEventListener("models", (e) => { if (S) { S.models = JSON.parse(e.data); renderTop(); } });
+  es.addEventListener("log", (e) => logLine(JSON.parse(e.data)));
+  es.addEventListener("trace", (e) => {
+    const d = JSON.parse(e.data);
+    const k = d.project + ":" + d.id;
+    const list = (traces[k] = traces[k] || []);
+    const shown = S && S.active && d.project === S.active.slug && openId === d.id;
+    const box = shown ? document.querySelector("#dbody .trace") : null;
+
+    if (d.append || d.close) {
+      const g = d.append || d.close;
+      growCached(list, g.seq, g.delta || "", !!d.close);
+      growRow(box, g.seq, g.delta || "", !!d.close);
+      return;
+    }
+    list.push(d.entry);
+    if (list.length > 300) list.shift();
+    if (box) { box.appendChild(traceRow(d.entry)); box.scrollTop = box.scrollHeight; }
+  });
+  es.addEventListener("planner", (e) => {
+    const d = JSON.parse(e.data);
+    if (d.append || d.close) {
+      const g = d.append || d.close;
+      growCached(plannerTrace, g.seq, g.delta || "", !!d.close);
+      growRow($("#ptrace"), g.seq, g.delta || "", !!d.close);
+    }
+    if (d.entry) {
+      plannerTrace.push(d.entry);
+      if (plannerTrace.length > 200) plannerTrace.shift();
+      const tb = $("#ptrace");
+      tb.style.display = "";
+      tb.appendChild(traceRow(d.entry));
+      tb.scrollTop = tb.scrollHeight;
+    }
+    if (d.delta) {
+      planText += d.delta;
+      const out = $("#pout");
+      const near = out.scrollTop + out.clientHeight > out.scrollHeight - 40;
+      out.classList.remove("idle");
+      out.textContent = planText;
+      if (near) out.scrollTop = out.scrollHeight;
+    }
+    if (d.done && d.text) planText = d.text;
+  });
+  es.addEventListener("delta", (e) => {
+    const d = JSON.parse(e.data);
+    if (d.kind !== "text") return;
+    const k = d.project + ":" + d.id;
+    liveText[k] = (liveText[k] || "") + d.delta;
+    if (S && S.active && d.project === S.active.slug) {
+      const card = [...document.querySelectorAll(".card")]
+        .find((c) => c.querySelector(".id") && c.querySelector(".id").textContent === d.id);
+      const st = card && card.querySelector(".stream");
+      if (st) st.textContent = liveText[k].slice(-320);
+      if (openId === d.id) {
+        const pre = $("#dbody").querySelector("pre.live");
+        if (pre) { pre.textContent = liveText[k]; pre.scrollTop = pre.scrollHeight; }
+      }
+    }
+  });
+
+  es.onerror = () => {
+    // EventSource retries on its own; surface it instead of leaving a dead page.
+    attempts++;
+    setConn("dead", "reconnecting (" + attempts + ")");
+    if (attempts === 3) {
+      banner("err", "Lost the connection to the board. Is it still running? " +
+        "Restart it with `kanban` in a terminal.", "conn");
+    }
+  };
+}
+
+connect();
+fetch("/api/state").then((r) => r.json()).then((s) => { S = s; render(); }).catch(() => {});
+</script>

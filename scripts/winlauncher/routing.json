@@ -1,0 +1,50 @@
+{
+  "_comment": "Single source of truth for model choices. Read by agents, tooling and the Phase 2 board scheduler. Model ids must match the section names in models.ini.",
+
+  "router": {
+    "baseUrl": "http://127.0.0.1:8080",
+    "apiKey": "test"
+  },
+
+  "mainModel": "bigbang",
+  "defaultTaskType": "research",
+
+  "models": {
+    "kat":     { "role": "code",    "parallel": 1, "maxCtx": 95000, "desc": "KAT-Coder, CPU-offloaded, best at writing and fixing code" },
+    "bigbang": { "role": "general", "parallel": 1, "maxCtx": 95000, "desc": "BigBang, CPU-offloaded, orchestration/research/review, pinned main model" },
+    "bonsai":  { "role": "fast",    "parallel": 4, "maxCtx": 55000, "desc": "Bonsai 1-bit, fits in VRAM, 4-way parallel, good only on short chains" }
+  },
+
+  "assignment": {
+    "_comment": "Complexity 1..10 decides who runs a task. The philosophy is to keep scores low by splitting: a high score means the task is not ready to run, not that a big model should attempt it.",
+    "decomposeAbove": 7,
+    "_review": "A finished task waits in Review until a DIFFERENT model verifies it by running tests. Order is tried top to bottom; the first model that is not the one that did the work wins. Dependents only unblock on a PASS, so with this disabled the board stops after the first card until you press Mark done.",
+    "review": { "enabled": true, "order": ["kat", "bigbang", "bonsai"] },
+    "preferParallel": true,
+    "parallelModel": "bonsai",
+    "minBatch": 3,
+    "codeTypes": ["code", "refactor", "debug", "test"],
+    "bands": [
+      { "upTo": 3, "model": "bonsai" },
+      { "upTo": 6, "code": "kat", "default": "bonsai" },
+      { "upTo": 7, "code": "kat", "default": "bigbang" }
+    ]
+  },
+
+  "taskTypes": {
+    "code":        "kat",
+    "refactor":    "kat",
+    "test":        "kat",
+    "debug":       "kat",
+
+    "research":    "bigbang",
+    "plan":        "bigbang",
+    "review":      "bigbang",
+    "orchestrate": "bigbang",
+
+    "summarize":   "bonsai",
+    "extract":     "bonsai",
+    "classify":    "bonsai",
+    "lint-fix":    "bonsai"
+  }
+}

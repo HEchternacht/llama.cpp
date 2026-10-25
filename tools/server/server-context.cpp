@@ -1159,6 +1159,11 @@ private:
     // if swa_full is enabled, this is set to 0 to simulate a non-SWA model
     int32_t n_swa;
 
+    // single-token tool-call opener (`<tool_call>`); a context checkpoint is taken right
+    // before it is decoded, so the next agent turn can resume there even when the client
+    // re-renders the tool call differently from what the model generated
+    llama_token tool_call_anchor = LLAMA_TOKEN_NULL;
+
     // slots / clients
     std::vector<server_slot> slots;
 
@@ -1533,6 +1538,14 @@ private:
 
         if (ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_FULL) {
             SRV_TRC("%s", "speculative decoding will use checkpoints\n");
+        }
+
+        {
+            const auto toks = common_tokenize(vocab, "<tool_call>", false, true);
+            if (toks.size() == 1) {
+                tool_call_anchor = toks[0];
+                SRV_INF("tool-call anchor checkpoints on token %d\n", tool_call_anchor);
+            }
         }
 
         // setup slots
@@ -3978,6 +3991,27 @@ private:
 
         // update the batch with the sampled/drafted tokens
         iterate(generating, [&](server_slot & slot) {
+            // checkpoint right before the first tool-call opener of the task (see tool_call_anchor)
+            if (tool_call_anchor != LLAMA_TOKEN_NULL && params_base.n_ctx_checkpoints > 0 &&
+                slot.task->type == SERVER_TASK_TYPE_COMPLETION && (
+                    ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_FULL ||
+                    ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_RS ||
+                    n_swa > 0)) {
+                // a fresh draft stops before the opener, so the opener is decoded as `sampled` at the batch start
+                auto & draft = slot.spec_draft;
+                if (!slot.spec_is_replay) {
+                    draft.erase(std::find(draft.begin(), draft.end(), tool_call_anchor), draft.end());
+                }
+
+                const auto & ckpts = slot.prompt.checkpoints;
+                const bool anchored = !ckpts.empty() && ckpts.back().id_task == slot.task->id &&
+                    ckpts.back().n_tokens > slot.task->n_tokens();
+                const auto pos_min = llama_memory_seq_pos_min(llama_get_memory(ctx_tgt), slot.id);
+                if (slot.sampled == tool_call_anchor && !anchored && pos_min >= 0) {
+                    create_checkpoint(slot, 0, pos_min, llama_memory_seq_pos_max(llama_get_memory(ctx_tgt), slot.id));
+                }
+            }
+
             slot.handle_last_sampled_token(batch);
         });
 
