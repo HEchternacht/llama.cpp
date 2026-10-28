@@ -1,0 +1,4 @@
+node_modules/
+config/freectl.json
+*.log
+config/freectl-state.json

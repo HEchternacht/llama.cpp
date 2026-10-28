@@ -1,0 +1,1677 @@
+uid: 35
+name: dltest
+waypoints:
+  1:
+    index: 1
+    lure: true
+    position:
+      x: 34066
+      y: 31884
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  2:
+    index: 2
+    lure: false
+    position:
+      x: 34066
+      y: 31884
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  3:
+    index: 3
+    lure: true
+    position:
+      x: 34062
+      y: 31883
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  4:
+    index: 4
+    lure: false
+    position:
+      x: 34062
+      y: 31883
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  5:
+    index: 5
+    lure: true
+    position:
+      x: 34060
+      y: 31879
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  6:
+    index: 6
+    lure: false
+    position:
+      x: 34060
+      y: 31879
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  7:
+    index: 7
+    lure: false
+    position:
+      x: 34056
+      y: 31877
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  8:
+    index: 8
+    lure: false
+    position:
+      x: 34056
+      y: 31877
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  9:
+    index: 9
+    lure: true
+    position:
+      x: 34052
+      y: 31877
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  10:
+    index: 10
+    lure: false
+    position:
+      x: 34052
+      y: 31877
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  11:
+    index: 11
+    lure: true
+    position:
+      x: 34048
+      y: 31875
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  12:
+    index: 12
+    lure: false
+    position:
+      x: 34048
+      y: 31875
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  13:
+    index: 13
+    lure: true
+    position:
+      x: 34052
+      y: 31874
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  14:
+    index: 14
+    lure: false
+    position:
+      x: 34052
+      y: 31874
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  15:
+    index: 15
+    lure: true
+    position:
+      x: 34056
+      y: 31872
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  16:
+    index: 16
+    lure: false
+    position:
+      x: 34056
+      y: 31872
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  17:
+    index: 17
+    lure: true
+    position:
+      x: 34057
+      y: 31868
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  18:
+    index: 18
+    lure: false
+    position:
+      x: 34057
+      y: 31868
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  19:
+    index: 19
+    lure: true
+    position:
+      x: 34057
+      y: 31864
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  20:
+    index: 20
+    lure: false
+    position:
+      x: 34057
+      y: 31864
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  21:
+    index: 21
+    lure: true
+    position:
+      x: 34057
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  22:
+    index: 22
+    lure: false
+    position:
+      x: 34057
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  23:
+    index: 23
+    lure: true
+    position:
+      x: 34058
+      y: 31856
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  24:
+    index: 24
+    lure: false
+    position:
+      x: 34058
+      y: 31856
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  25:
+    index: 25
+    lure: true
+    position:
+      x: 34062
+      y: 31855
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  26:
+    index: 26
+    lure: false
+    position:
+      x: 34062
+      y: 31855
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  27:
+    index: 27
+    lure: true
+    position:
+      x: 34058
+      y: 31854
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  28:
+    index: 28
+    lure: false
+    position:
+      x: 34058
+      y: 31854
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  29:
+    index: 29
+    lure: false
+    position:
+      x: 34054
+      y: 31854
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  30:
+    index: 30
+    lure: false
+    position:
+      x: 34054
+      y: 31854
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  31:
+    index: 31
+    lure: true
+    position:
+      x: 34051
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  32:
+    index: 32
+    lure: false
+    position:
+      x: 34051
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  33:
+    index: 33
+    lure: true
+    position:
+      x: 34047
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  34:
+    index: 34
+    lure: false
+    position:
+      x: 34047
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  35:
+    index: 35
+    lure: true
+    position:
+      x: 34043
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  36:
+    index: 36
+    lure: false
+    position:
+      x: 34043
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  37:
+    index: 37
+    lure: false
+    position:
+      x: 34037
+      y: 31848
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  38:
+    index: 38
+    lure: false
+    position:
+      x: 34037
+      y: 31848
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  39:
+    index: 39
+    lure: true
+    position:
+      x: 34036
+      y: 31844
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  40:
+    index: 40
+    lure: false
+    position:
+      x: 34036
+      y: 31844
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  41:
+    index: 41
+    lure: true
+    position:
+      x: 34032
+      y: 31841
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  42:
+    index: 42
+    lure: false
+    position:
+      x: 34032
+      y: 31841
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  43:
+    index: 43
+    lure: true
+    position:
+      x: 34028
+      y: 31838
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  44:
+    index: 44
+    lure: false
+    position:
+      x: 34028
+      y: 31838
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  45:
+    index: 45
+    lure: true
+    position:
+      x: 34024
+      y: 31835
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  46:
+    index: 46
+    lure: false
+    position:
+      x: 34024
+      y: 31835
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  47:
+    index: 47
+    lure: true
+    position:
+      x: 34024
+      y: 31839
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  48:
+    index: 48
+    lure: false
+    position:
+      x: 34024
+      y: 31839
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  49:
+    index: 49
+    lure: true
+    position:
+      x: 34020
+      y: 31840
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  50:
+    index: 50
+    lure: false
+    position:
+      x: 34020
+      y: 31840
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  51:
+    index: 51
+    lure: true
+    position:
+      x: 34016
+      y: 31840
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  52:
+    index: 52
+    lure: false
+    position:
+      x: 34016
+      y: 31840
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  53:
+    index: 53
+    lure: true
+    position:
+      x: 34014
+      y: 31844
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  54:
+    index: 54
+    lure: false
+    position:
+      x: 34014
+      y: 31844
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  55:
+    index: 55
+    lure: true
+    position:
+      x: 34010
+      y: 31845
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  56:
+    index: 56
+    lure: false
+    position:
+      x: 34010
+      y: 31845
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  57:
+    index: 57
+    lure: true
+    position:
+      x: 34006
+      y: 31843
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  58:
+    index: 58
+    lure: false
+    position:
+      x: 34006
+      y: 31843
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  59:
+    index: 59
+    lure: true
+    position:
+      x: 34002
+      y: 31842
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  60:
+    index: 60
+    lure: false
+    position:
+      x: 34002
+      y: 31842
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  61:
+    index: 61
+    lure: true
+    position:
+      x: 34006
+      y: 31846
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  62:
+    index: 62
+    lure: false
+    position:
+      x: 34006
+      y: 31846
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  63:
+    index: 63
+    lure: false
+    position:
+      x: 34007
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  64:
+    index: 64
+    lure: false
+    position:
+      x: 34007
+      y: 31850
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  65:
+    index: 65
+    lure: true
+    position:
+      x: 34007
+      y: 31852
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  66:
+    index: 66
+    lure: false
+    position:
+      x: 34007
+      y: 31852
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  67:
+    index: 67
+    lure: true
+    position:
+      x: 34009
+      y: 31856
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  68:
+    index: 68
+    lure: false
+    position:
+      x: 34009
+      y: 31856
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  69:
+    index: 69
+    lure: true
+    position:
+      x: 34013
+      y: 31857
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  70:
+    index: 70
+    lure: false
+    position:
+      x: 34013
+      y: 31857
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  71:
+    index: 71
+    lure: false
+    position:
+      x: 34016
+      y: 31861
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  72:
+    index: 72
+    lure: false
+    position:
+      x: 34016
+      y: 31861
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  73:
+    index: 73
+    lure: true
+    position:
+      x: 34020
+      y: 31862
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  74:
+    index: 74
+    lure: false
+    position:
+      x: 34020
+      y: 31862
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  75:
+    index: 75
+    lure: true
+    position:
+      x: 34024
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  76:
+    index: 76
+    lure: false
+    position:
+      x: 34024
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  77:
+    index: 77
+    lure: true
+    position:
+      x: 34020
+      y: 31859
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  78:
+    index: 78
+    lure: false
+    position:
+      x: 34020
+      y: 31859
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  79:
+    index: 79
+    lure: false
+    position:
+      x: 34016
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  80:
+    index: 80
+    lure: false
+    position:
+      x: 34016
+      y: 31860
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  81:
+    index: 81
+    lure: true
+    position:
+      x: 34012
+      y: 31863
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  82:
+    index: 82
+    lure: false
+    position:
+      x: 34012
+      y: 31863
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  83:
+    index: 83
+    lure: true
+    position:
+      x: 34008
+      y: 31865
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  84:
+    index: 84
+    lure: false
+    position:
+      x: 34008
+      y: 31865
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  85:
+    index: 85
+    lure: true
+    position:
+      x: 34004
+      y: 31868
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  86:
+    index: 86
+    lure: false
+    position:
+      x: 34004
+      y: 31868
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  87:
+    index: 87
+    lure: true
+    position:
+      x: 33998
+      y: 31871
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  88:
+    index: 88
+    lure: false
+    position:
+      x: 33998
+      y: 31871
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  89:
+    index: 89
+    lure: false
+    position:
+      x: 34002
+      y: 31875
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  90:
+    index: 90
+    lure: false
+    position:
+      x: 34002
+      y: 31875
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  91:
+    index: 91
+    lure: true
+    position:
+      x: 34003
+      y: 31879
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  92:
+    index: 92
+    lure: false
+    position:
+      x: 34003
+      y: 31879
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  93:
+    index: 93
+    lure: true
+    position:
+      x: 34007
+      y: 31882
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  94:
+    index: 94
+    lure: false
+    position:
+      x: 34007
+      y: 31882
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  95:
+    index: 95
+    lure: true
+    position:
+      x: 34011
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  96:
+    index: 96
+    lure: false
+    position:
+      x: 34011
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  97:
+    index: 97
+    lure: true
+    position:
+      x: 34015
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  98:
+    index: 98
+    lure: false
+    position:
+      x: 34015
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  99:
+    index: 99
+    lure: true
+    position:
+      x: 34019
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  100:
+    index: 100
+    lure: false
+    position:
+      x: 34019
+      y: 31885
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  101:
+    index: 101
+    lure: true
+    position:
+      x: 34023
+      y: 31889
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  102:
+    index: 102
+    lure: false
+    position:
+      x: 34023
+      y: 31889
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  103:
+    index: 103
+    lure: true
+    position:
+      x: 34025
+      y: 31893
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  104:
+    index: 104
+    lure: false
+    position:
+      x: 34025
+      y: 31893
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  105:
+    index: 105
+    lure: true
+    position:
+      x: 34029
+      y: 31892
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  106:
+    index: 106
+    lure: false
+    position:
+      x: 34029
+      y: 31892
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  107:
+    index: 107
+    lure: true
+    position:
+      x: 34036
+      y: 31891
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  108:
+    index: 108
+    lure: false
+    position:
+      x: 34036
+      y: 31891
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  109:
+    index: 109
+    lure: false
+    position:
+      x: 34030
+      y: 31896
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  110:
+    index: 110
+    lure: false
+    position:
+      x: 34030
+      y: 31896
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  111:
+    index: 111
+    lure: true
+    position:
+      x: 34029
+      y: 31900
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  112:
+    index: 112
+    lure: false
+    position:
+      x: 34029
+      y: 31900
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  113:
+    index: 113
+    lure: true
+    position:
+      x: 34029
+      y: 31904
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  114:
+    index: 114
+    lure: false
+    position:
+      x: 34029
+      y: 31904
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  115:
+    index: 115
+    lure: true
+    position:
+      x: 34029
+      y: 31905
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  116:
+    index: 116
+    lure: false
+    position:
+      x: 34029
+      y: 31905
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  117:
+    index: 117
+    lure: true
+    position:
+      x: 34025
+      y: 31908
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  118:
+    index: 118
+    lure: false
+    position:
+      x: 34025
+      y: 31908
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  119:
+    index: 119
+    lure: true
+    position:
+      x: 34023
+      y: 31912
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  120:
+    index: 120
+    lure: false
+    position:
+      x: 34023
+      y: 31912
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  121:
+    index: 121
+    lure: false
+    position:
+      x: 34028
+      y: 31909
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  122:
+    index: 122
+    lure: false
+    position:
+      x: 34028
+      y: 31909
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  123:
+    index: 123
+    lure: true
+    position:
+      x: 34030
+      y: 31910
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  124:
+    index: 124
+    lure: false
+    position:
+      x: 34030
+      y: 31910
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  125:
+    index: 125
+    lure: true
+    position:
+      x: 34034
+      y: 31911
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  126:
+    index: 126
+    lure: false
+    position:
+      x: 34034
+      y: 31911
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  127:
+    index: 127
+    lure: true
+    position:
+      x: 34038
+      y: 31912
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  128:
+    index: 128
+    lure: false
+    position:
+      x: 34038
+      y: 31912
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  129:
+    index: 129
+    lure: true
+    position:
+      x: 34042
+      y: 31911
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  130:
+    index: 130
+    lure: false
+    position:
+      x: 34042
+      y: 31911
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  131:
+    index: 131
+    lure: true
+    position:
+      x: 34046
+      y: 31910
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  132:
+    index: 132
+    lure: false
+    position:
+      x: 34046
+      y: 31910
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  133:
+    index: 133
+    lure: true
+    position:
+      x: 34050
+      y: 31907
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  134:
+    index: 134
+    lure: false
+    position:
+      x: 34050
+      y: 31907
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  135:
+    index: 135
+    lure: true
+    position:
+      x: 34051
+      y: 31903
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  136:
+    index: 136
+    lure: false
+    position:
+      x: 34051
+      y: 31903
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  137:
+    index: 137
+    lure: true
+    position:
+      x: 34051
+      y: 31899
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  138:
+    index: 138
+    lure: false
+    position:
+      x: 34051
+      y: 31899
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  139:
+    index: 139
+    lure: true
+    position:
+      x: 34055
+      y: 31897
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  140:
+    index: 140
+    lure: false
+    position:
+      x: 34055
+      y: 31897
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  141:
+    index: 141
+    lure: true
+    position:
+      x: 34059
+      y: 31900
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  142:
+    index: 142
+    lure: false
+    position:
+      x: 34059
+      y: 31900
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  143:
+    index: 143
+    lure: true
+    position:
+      x: 34063
+      y: 31899
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  144:
+    index: 144
+    lure: false
+    position:
+      x: 34063
+      y: 31899
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  145:
+    index: 145
+    lure: true
+    position:
+      x: 34068
+      y: 31896
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  146:
+    index: 146
+    lure: false
+    position:
+      x: 34068
+      y: 31896
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  147:
+    index: 147
+    lure: false
+    position:
+      x: 34069
+      y: 31892
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  148:
+    index: 148
+    lure: false
+    position:
+      x: 34069
+      y: 31892
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  149:
+    index: 149
+    lure: true
+    position:
+      x: 34072
+      y: 31888
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  150:
+    index: 150
+    lure: false
+    position:
+      x: 34072
+      y: 31888
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+  151:
+    index: 151
+    lure: true
+    position:
+      x: 34070
+      y: 31884
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 12
+    creatures: 10
+  152:
+    index: 152
+    lure: false
+    position:
+      x: 34070
+      y: 31884
+      z: 14
+    teleport: false
+    resume: 9
+    speed: 13
+    creatures: 10
+version: 1
+creation: 1784600007

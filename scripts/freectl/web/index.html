@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freectl</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <h1>freectl</h1>
+  <span class="muted" id="refreshed"></span>
+  <span style="flex:1"></span>
+  <button class="action" id="btn-refresh">Re-list providers</button>
+</header>
+
+<nav class="tabs">
+  <button data-tab="status" class="active">Status</button>
+  <button data-tab="ranking">Ranking</button>
+  <button data-tab="providers">Providers</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+
+<main>
+  <section class="tab-panel active" id="tab-status">
+    <div class="panel">
+      <h2>Default cascade <span class="muted">(strongest first — on any error the next one answers)</span></h2>
+      <ol id="cascade"></ol>
+    </div>
+    <div class="panel">
+      <h2>Free models</h2>
+      <p><button class="action primary" id="btn-test-all">Test all models</button> <span class="muted" id="test-all-note"></span></p>
+      <table id="models-table">
+        <thead><tr><th>#</th><th>Model</th><th>Params</th><th>Context</th><th>Score</th><th>OK / failed</th><th>Latency</th><th>State</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Changes <span class="muted">(found by the periodic re-list and re-test)</span></h2>
+      <ul id="changes"></ul>
+    </div>
+    <div class="panel">
+      <h2>Left the free tier <span class="muted">(billing errors; hidden until a test answers again)</span></h2>
+      <table id="paid-table">
+        <thead><tr><th>Model</th><th>Since</th><th>Error</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Providers</h2>
+      <table id="prov-status-table">
+        <thead><tr><th>Provider</th><th>Enabled</th><th>Free models</th><th>Filtered out</th><th>Error</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-ranking">
+    <div class="panel">
+      <h2>Ranking <span class="muted">(drag to reorder — top = tried first by default; saved order becomes the priority list)</span></h2>
+      <div class="toolbar">
+        <button class="action primary" id="rank-save">Save order</button>
+        <button class="action" id="rank-reset">Reset to automatic</button>
+        <button class="action" id="rank-test-all">Test all</button>
+        <button class="action" id="rank-drop-failing">Take failing out of default</button>
+        <label><input type="checkbox" id="rank-hide-failing"> hide failing</label>
+        <span class="muted" id="rank-note"></span>
+      </div>
+      <ol id="rank-list" class="rank"></ol>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-providers">
+    <div class="panel">
+      <h2>Providers <span class="muted">(any OpenAI-compatible endpoint)</span></h2>
+      <div id="prov-list"></div>
+      <button class="action" id="btn-add-prov">+ Add provider</button>
+      <button class="action primary" id="btn-save-prov">Save</button>
+      <span class="muted" id="prov-note"></span>
+      <p class="muted">Free rule: a model counts as free when its id matches the provider's pattern (empty = the global
+        pattern from Settings). Use <code>.*</code> when the provider's free tier covers every model (e.g. Groq).
+        API key: the literal key or <code>env:NAME</code>. Include / exclude: upstream ids, one per line.</p>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-settings">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="grid">
+        <label>Global free pattern (regex)</label><input id="s-free_pattern">
+        <label>Non-chat exclude pattern (regex)</label><input id="s-exclude_pattern">
+        <label>Min context (drop smaller models)</label><input id="s-min_context" type="number">
+        <label>Cooldown after failure (s)</label><input id="s-cooldown_seconds" type="number">
+        <label>First byte timeout (s)</label><input id="s-first_byte_timeout_seconds" type="number">
+        <label>Max attempts per request</label><input id="s-max_attempts" type="number">
+        <label>Default context (0 = smallest in cascade)</label><input id="s-default_context_length" type="number">
+        <label>Refresh every (min, restart)</label><input id="s-refresh_minutes" type="number">
+        <label>Re-test models older than (h, 0 = off)</label><input id="s-check_hours" type="number">
+        <label>Prefer different providers on parallel requests</label><input id="s-prefer_different_providers" type="checkbox">
+        <label>Port (restart)</label><input id="s-port" type="number">
+        <label>API key</label><input id="s-api_key">
+      </div>
+      <div class="two">
+        <div><label>Priority (strongest first, one id per line — beats the heuristic)</label><textarea id="s-priority" rows="8"></textarea></div>
+        <div><label>Keep out of the default cascade (one id per line)</label><textarea id="s-cascade_exclude" rows="8"></textarea></div>
+      </div>
+      <button class="action primary" id="btn-save-settings">Save</button>
+      <span class="muted" id="settings-note"></span>
+    </div>
+  </section>
+</main>
+
+<template id="prov-tpl">
+  <div class="prov">
+    <div class="grid">
+      <label>Name (id prefix)</label><input data-k="name">
+      <label>Base URL</label><input data-k="baseUrl" placeholder="https://.../v1">
+      <label>API key</label><input data-k="apiKey">
+      <label>Free pattern</label><input data-k="freePattern" placeholder="(global)">
+      <label>Enabled</label><input data-k="enabled" type="checkbox">
+    </div>
+    <div class="two">
+      <div><label>Include (always exposed)</label><textarea data-k="include" rows="3"></textarea></div>
+      <div><label>Exclude (never exposed)</label><textarea data-k="exclude" rows="3"></textarea></div>
+    </div>
+    <button class="action danger" data-act="remove">Remove</button>
+  </div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
