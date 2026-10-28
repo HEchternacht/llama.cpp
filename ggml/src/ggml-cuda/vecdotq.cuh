@@ -40,18 +40,18 @@ static __device__ __forceinline__ int2 get_int_from_table_16(const int & q4, con
     const uint32_t q_odd  = (q4 >> 4);
 
     // Perform lookups in the lower half of the table (indices 0-7).
-    uint32_t v_even_low = __builtin_amdgcn_perm(values[1], values[0], q_even & 0x07070707);
-    uint32_t v_odd_low = __builtin_amdgcn_perm(values[1], values[0], q_odd & 0x07070707);
+    uint32_t v_even_low = ggml_hip_perm(values[1], values[0], q_even & 0x07070707);
+    uint32_t v_odd_low  = ggml_hip_perm(values[1], values[0], q_odd & 0x07070707);
 
     // Perform lookups in the upper half of the table (indices 8-15).
-    uint32_t v_even_high = __builtin_amdgcn_perm(values[3], values[2], q_even & 0x07070707);
-    uint32_t v_odd_high = __builtin_amdgcn_perm(values[3], values[2], q_odd & 0x07070707);
+    uint32_t v_even_high = ggml_hip_perm(values[3], values[2], q_even & 0x07070707);
+    uint32_t v_odd_high  = ggml_hip_perm(values[3], values[2], q_odd & 0x07070707);
 
     // Select between the low and high results based on the MSB of each index nibble.
     uint32_t mask_even = 0x03020100 | ((q_even & 0x08080808) >> 1);
-    uint32_t res_x = __builtin_amdgcn_perm(v_even_high, v_even_low, mask_even);
+    uint32_t res_x     = ggml_hip_perm(v_even_high, v_even_low, mask_even);
     uint32_t mask_odd = 0x03020100 | ((q_odd & 0x08080808) >> 1);
-    uint32_t res_y = __builtin_amdgcn_perm(v_odd_high, v_odd_low, mask_odd);
+    uint32_t res_y     = ggml_hip_perm(v_odd_high, v_odd_low, mask_odd);
 
     return make_int2(res_x, res_y);
 #elif !defined(GGML_USE_MUSA)
