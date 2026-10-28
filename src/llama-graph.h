@@ -25,6 +25,7 @@ struct llama_hadamard;
 class llama_moe_cache;
 
 struct llama_memory_context_i;
+struct llama_moe_hcache;
 
 class llama_kv_cache_context;
 class llama_kv_cache_dsa_context;
@@ -878,6 +879,7 @@ struct llm_graph_params {
     const llama_cross            * cross;
     const llama_dspark_ctx       * dspark_ctx;
     const llama_moe_cache        * moe_cache;
+          llama_moe_hcache       * moe_hcache;
 
     const llama_prec_policy * prec_policy = nullptr;
 
@@ -1143,6 +1145,7 @@ struct llm_graph_context {
     const llama_cross            * cross;
     const llama_dspark_ctx       * dspark_ctx;
     const llama_moe_cache        * moe_cache;
+          llama_moe_hcache       * moe_hcache;
 
     const llama_prec_policy * prec_policy;
 

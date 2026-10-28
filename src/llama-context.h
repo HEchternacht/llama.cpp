@@ -8,6 +8,7 @@
 #include "llama-impl.h"
 #include "llama-memory.h"
 #include "llama-moe-cache.h"
+#include "llama-moe-hcache.h"
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
@@ -331,6 +332,8 @@ private:
     // see llama_dspark_ctx in llama-graph.h for why this needs its own side channel
     // instead of riding batch.token/embd.
     llama_dspark_ctx dspark_ctx;
+
+    std::unique_ptr<llama_moe_hcache> moe_hcache;
 
     llama_memory_ptr memory;
     llama_moe_cache_ptr moe_cache;

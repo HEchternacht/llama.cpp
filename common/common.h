@@ -379,6 +379,15 @@ struct common_params_speculative_ngram_map {
     uint16_t size_n   = 12; // ngram size for lookup
     uint16_t size_m   = 48; // mgram size for speculative tokens
     uint16_t min_hits = 1;  // minimum hits at ngram/mgram lookup for mgram to be proposed
+
+    // dynamic lookup (ngram-map-k / ngram-map-k4v only): once `size_m_streak` consecutive drafts
+    // for a key were fully accepted, the draft for that key is grown past size_m up to size_m_max
+    // tokens (clamped to how much matching context is actually available). This lets a verbatim
+    // copy of long context (quoting a document, repeating a command) draft further ahead than
+    // size_m without raising the draft length - and its cost - for ordinary generation, where
+    // drafts are not fully accepted. 0 disables growth (default: off).
+    uint16_t size_m_max    = 0;
+    uint16_t size_m_streak = 2;
 };
 
 struct common_params_speculative_ngram_cache {

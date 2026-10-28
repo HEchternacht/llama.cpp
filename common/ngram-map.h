@@ -69,10 +69,24 @@ struct common_ngram_map {
 
     bool     show_key_map_stats = false; // true, if statistics of the key_map should be printed.
 
+    // Dynamic lookup: while the model keeps fully accepting the size_value-token draft (a run of
+    // streak_required consecutive full accepts), the draft offered for that key is grown past
+    // size_value up to size_value_max tokens, bounded by how much matching context is actually
+    // available. This targets verbatim-copy spans (quoting a document, repeating a command) that
+    // are longer than size_value without raising the cost of ordinary generation, where most drafts
+    // are not fully accepted and the draft length falls back to size_value. 0 disables growth.
+    uint16_t size_value_max  = 0;
+    uint16_t streak_required = 0;
+
+    // internal: consecutive full-accept count and the length of the most recently offered draft,
+    // used to decide whether to grow (see common_ngram_map_draft/common_ngram_map_accept).
+    uint16_t streak_full_accept = 0;
+    size_t   last_draft_len     = 0;
+
     common_ngram_map(uint16_t sz_key, uint16_t sz_value, bool only_keys,
-                     uint16_t min_hits)
+                     uint16_t min_hits, uint16_t sz_value_max = 0, uint16_t strk_required = 0)
         : size_key(sz_key), size_value(sz_value), key_only(only_keys),
-          min_hits(min_hits) {
+          min_hits(min_hits), size_value_max(sz_value_max), streak_required(strk_required) {
         key_map.resize(COMMON_NGRAM_HASH_MAP_SIZE); // 2^18 hash entries, 0 entries if key_map shouldn't be used
     }
 

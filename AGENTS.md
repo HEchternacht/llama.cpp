@@ -253,13 +253,35 @@ This fork carries local performance changes on top of upstream. When merging/reb
 against upstream (ggml-org/llama.cpp), conflicts in the files below must be resolved
 PREFERRING THE FORK'S (ours) version - these changes are intentional and must survive:
 
-- `ggml/src/ggml-backend.cpp` - the main fork feature set:
+- `ggml/src/ggml-backend.cpp` - the main fork feature set (prefetch upload lives in `ggml_backend_sched_copy_input`):
   - weight prefetch of upcoming split weights on a second CUDA backend (copy stream)
   - double-buffered staging (2 slots) so upload of split N+1 overlaps compute of split N
   - full-tensor uploads for batches >= ~128 tokens (prompt processing path)
   - env `GGML_SCHED_PREFETCH=0` disables prefetch
   - env `GGML_SCHED_PERF=N` prints per-backend copy/compute ms per graph every N graphs
-- `ggml/src/ggml-cpu/ggml-cpu.c` - CPU-side load/compute optimizations
+  - a CPU split without inputs right after a device split does not wait for the device (lets
+    the MoE cache's GPU hits and CPU misses run concurrently)
+- `ggml/src/ggml-cpu/ggml-cpu.c` - CPU-side load/compute optimizations; MUL_MAT_ID treats a
+  negative expert id as "skip, output zeros"
+- `ggml/src/ggml-cuda/mmvq.cu` - MUL_MAT_ID single-token kernel skips negative expert ids
+- `src/llama-moe-hcache.{h,cpp}` (class `llama_moe_hcache`, member `moe_hcache`) + hooks in `llama-graph.cpp`
+  (build_moe_ffn, `build_experts` lambda), `llama-context.{h,cpp}`. Renamed from llama-moe-cache in the 2026-10-23 sync:
+  upstream now has its own `llama_moe_cache` (`--moe-cache-mib`, all experts run on the GPU from a slot map). The two
+  are exclusive: the hybrid cache stays off when the upstream one is active.
+  hybrid MoE expert cache for -ncmoe/-cmoe decode (batches <= 8 tokens). Frequently routed experts
+  (LFU, decayed counts) live in a VRAM slot pool; hits run on the GPU, misses on the CPU, partial
+  results are summed; misses are uploaded by a worker thread. Off unless `LLAMA_MOE_CACHE_MIB=<VRAM MiB>`
+  or `=auto` (free VRAM after sched_reserve minus `LLAMA_MOE_CACHE_RESERVE_MIB`, default 0, may be negative;
+  the context then reserves the scheduler again).
+  Knobs: `LLAMA_MOE_CACHE_FETCH` (uploads/token, 64), `LLAMA_MOE_CACHE_DECAY` (0.995),
+  `LLAMA_MOE_CACHE_MAX_TOKENS` (8), `LLAMA_MOE_CACHE_STATS=N` (hit rate log every N tokens, needs -v).
+  RTX 4050 6GB + qwen35moe Q5_K_M, -ncmoe 40, 3000 MiB: ~+11% tg (31 -> 34.6 t/s), ~50% hit rate.
+- `tools/server/server-context.cpp` - tool-call anchor checkpoint: when `<tool_call>` is a single
+  token and context checkpoints are active (hybrid/recurrent/SWA), a checkpoint is created right
+  before the first sampled `<tool_call>` of a task (fresh spec drafts are cut before it), so the
+  next agent turn resumes after the reasoning instead of at the previous prompt end.
+- `common/speculative.cpp` - `common_speculative_n_max` includes ngram-map `size_m_max` (dynamic
+  drafts), otherwise the server asserts `n_outputs_max <= cparams.n_outputs_max`
 - `src/llama-mmap.cpp`, `src/llama-mmap.h` - model load-time optimizations
 - `src/llama-model-loader.cpp` - model load-time optimizations
 
