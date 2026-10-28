@@ -1,3 +1,37 @@
+> # HEchternacht/llama.cpp: fork notes
+> Personal Windows (MSVC + CUDA) fork of [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp), tuned for running big **MoE models on a 6 GB laptop GPU** (RTX 4050) with experts offloaded to CPU (`-ncmoe` / `-cmoe`). Branch **`k2-horizon-merge`** is the current line: upstream master (2026-10-28) + everything below. Upstream README follows unchanged.
+>
+> ## What is different from upstream
+> **Performance (kept on every upstream merge, see `AGENTS.md`)**
+> - **Weight prefetch + double-buffered staging** in `ggml-backend.cpp`: the next split's weights are uploaded on a second CUDA copy stream while the current split computes; full-tensor uploads for prompts >= ~128 tokens. `GGML_SCHED_PREFETCH=0` disables it, `GGML_SCHED_PERF=N` prints per-backend copy/compute times.
+> - **Hybrid MoE expert cache** (`src/llama-moe-hcache.*`): frequently routed experts (LFU with decay) sit in a VRAM slot pool during `-ncmoe` decode; hits run on the GPU, misses on the CPU, results are summed. Enable with `LLAMA_MOE_CACHE_MIB=<MiB>` or `auto`. RTX 4050 6 GB + Qwen3.5-MoE Q5_K_M, `-ncmoe 40`: ~+11% decode (31 -> 34.6 t/s).
+> - **Windows mmap prefetch** that actually makes the model resident before load returns, plus loader optimizations.
+> - Q2_0 fast path on AVX-VNNI CPUs; CUDA TQ2_0 (dequant, get_rows, mmvq); faster Q1_0 extraction.
+> - Upstream CUDA MMQ refactor (#24127) **reverted**: it breaks `MUL_MAT_ID` with CPU-offloaded experts on sm_89.
+>
+> **Server / speculative**
+> - Tool-call anchor checkpoint in `server-context.cpp`: a context checkpoint right before the first `<tool_call>` so the next agent turn resumes after the reasoning, not at the previous prompt end.
+> - ngram-map dynamic drafts counted in `common_speculative_n_max`; DSpark block-diffusion drafter.
+>
+> **Merged from other forks**: [PrismML-Eng](https://github.com/PrismML-Eng/llama.cpp) (Bonsai **Q2_0 with 128-element blocks**, incompatible with upstream's 64-element Q2_0; DSpark, GDN rows mode, Hopper Q1_0/Q2_0 prefill, KV mean-centering), [MBZUAI-IFM](https://github.com/MBZUAI-IFM/llama.cpp) (**K2 Horizon** model: conversion, graph, chat template, MoVA experts covered by `-ncmoe`), [RaymondHuang210129](https://github.com/RaymondHuang210129/llama.cpp-adaptive-kv-streaming) (adaptive KV streaming), plus converters for the "maple" model and the Qwen4 `hc` ops.
+>
+> **`scripts/`** (not upstream)
+> - `winlauncher/`: Windows launcher suite (tray, model picker, prefix cache, context-menu installer), `kanban/` task board server.
+> - `llamactl/`: TypeScript service that starts/stops `llama-server` profiles, proxies requests, polls metrics, manages prefix cache.
+> - `freectl/`: router across free LLM API tiers (copy `config/freectl.example.json` to `freectl.json` and add your keys; the real config is git-ignored).
+>
+> ## Build (Windows, MSVC, CUDA)
+> ```powershell
+> cmake -B build -DGGML_CUDA=ON -DGGML_AVX_VNNI=ON -DGGML_BMI2=ON   # MSVC does not autodetect these two
+> cmake --build build --config Release -j
+> ```
+> Do not leave stale `ggml*.dll` files next to the binaries: `ggml_backend_load_all` loads them even in static builds and overrides the built-in backends.
+>
+> ## Merging upstream
+> `git merge upstream/master -X ours`, then confirm `GGML_SCHED_PREFETCH` / `GGML_SCHED_PERF` still exist in `ggml-backend.cpp` (details in `AGENTS.md`).
+
+---
+
 # llama.cpp
 
 ![llama](https://raw.githubusercontent.com/ggml-org/llama.brand/refs/heads/master/cover/llama-cpp/cover-llama-cpp-dark.svg)
